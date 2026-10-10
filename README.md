@@ -97,6 +97,34 @@ by default, so a public deployment cannot be used to make outbound calls.
 
 On Windows without `make`, run the same commands with `python -m uv run ...`.
 
+## Deploying a read-only showcase (Vercel)
+
+The dashboard can be published on its own, with no Python API, database or
+training worker, as a read-only showcase of results you computed locally.
+
+1. Run experiments locally, then export them:
+   `uv run python scripts/export_snapshot.py` (or `make snapshot`). This writes
+   real API responses for every completed experiment to
+   `apps/web/public/snapshot/`. Pass `--experiment <id>` (repeatable) to export
+   only some. The export refuses to finish if any file contains a local path,
+   and the System page is replaced with a description of the snapshot.
+2. Commit and push `apps/web/public/snapshot/`.
+3. On [vercel.com/new](https://vercel.com/new), import the GitHub repository
+   and set **Root Directory** to `apps/web`. No environment variables are
+   needed: on Vercel, `next.config.ts` turns on snapshot mode
+   (`NEXT_PUBLIC_AETHER_SNAPSHOT=true`) and fills in the GitHub link
+   automatically.
+
+In snapshot mode the API client reads `/snapshot/*.json` and applies the
+API's own filtering and pagination in the browser. Anything that would change
+state (new experiments, imports, final tests) shows a read-only message. To
+update the live site, re-run the export, commit and push. Vercel redeploys on
+push.
+
+A fully live deployment (Vercel dashboard + hosted API, worker, Postgres and
+Redis) is described under Docker Compose below. Set
+`NEXT_PUBLIC_AETHER_SNAPSHOT=false` and `NEXT_PUBLIC_API_URL` on Vercel for that.
+
 ## Full stack with Docker Compose
 
 ```bash

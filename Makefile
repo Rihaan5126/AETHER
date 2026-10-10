@@ -4,7 +4,7 @@ UV ?= uv
 WEB := apps/web
 API_PORT ?= 8000
 
-.PHONY: help install init-db demo api worker web dev test test-py test-web e2e lint typecheck format check up down logs clean
+.PHONY: help install init-db demo snapshot api worker web dev test test-py test-web e2e lint typecheck format check up down logs clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -18,6 +18,9 @@ init-db: ## Create/upgrade the database schema (SQLite by default)
 
 demo: init-db ## Import synthetic data and run a small reproducible evolution experiment
 	$(UV) run aether demo --generations 3 --population 8 --seed 42
+
+snapshot: ## Export completed experiments to apps/web/public/snapshot (read-only Vercel showcase)
+	$(UV) run python scripts/export_snapshot.py
 
 api: ## Run the API with the in-process job runner (http://localhost:8000)
 	$(UV) run uvicorn aether_api.main:app --reload --port $(API_PORT)
