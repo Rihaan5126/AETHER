@@ -60,7 +60,7 @@ def system_status(
         "cpu_percent": psutil.cpu_percent(interval=None),
         "memory_total_mb": round(vm.total / 2**20),
         "memory_used_percent": vm.percent,
-        "load_average": [round(x, 2) for x in os.getloadavg()],
+        "load_average": [round(x, 2) for x in psutil.getloadavg()],
         "disk_free_gb": round(disk.free / 2**30, 1),
     }
     ok = database["ok"] and (settings.job_backend != "celery" or queue.get("redis_ok"))

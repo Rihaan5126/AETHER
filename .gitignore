@@ -14,6 +14,9 @@ artifacts/*
 !artifacts/.gitkeep
 datasets/store/
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 *.sqlite
 .env
 

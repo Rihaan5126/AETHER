@@ -97,8 +97,14 @@ export function OverviewPage() {
               actions={<PeriodBadge period="validation" />}
             />
             <CardBody>
-              {board.isLoading || detail.isLoading ? (
+              {experiments.isPending || board.isLoading || detail.isLoading ? (
                 <Skeleton className="h-72" />
+              ) : detail.isError || board.isError ? (
+                <ErrorState error={detail.error ?? board.error} />
+              ) : !latestCompleted ? (
+                <EmptyState title="No completed experiment yet">
+                  The leaderboard appears here once an experiment finishes its last generation.
+                </EmptyState>
               ) : top ? (
                 <>
                   <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">

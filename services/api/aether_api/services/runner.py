@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import resource
+import sys
 import time
 from typing import Any, cast
 
 import pandas as pd
+import psutil
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from trading_engine.agents import load_agent, parse_genome, save_agent
@@ -68,12 +69,21 @@ def _num(value: Any) -> float | None:
     return float(value) if isinstance(value, int | float) else None
 
 
+def _peak_rss_mb() -> float:
+    """Peak resident memory of this process; `resource` is Unix-only, so use psutil on Windows."""
+    if sys.platform == "win32":
+        return float(psutil.Process().memory_info().peak_wset) / 2**20
+    import resource  # noqa: PLC0415
+
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+
+
 def _usage() -> dict[str, float]:
-    ru = resource.getrusage(resource.RUSAGE_SELF)
+    cpu = psutil.Process().cpu_times()
     return {
-        "cpu_user_seconds": round(ru.ru_utime, 2),
-        "cpu_system_seconds": round(ru.ru_stime, 2),
-        "max_rss_mb": round(ru.ru_maxrss / 1024, 1),
+        "cpu_user_seconds": round(cpu.user, 2),
+        "cpu_system_seconds": round(cpu.system, 2),
+        "max_rss_mb": round(_peak_rss_mb(), 1),
     }
 
 
