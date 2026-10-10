@@ -1,0 +1,56 @@
+"""Structured API errors: ``{"error": {"code", "message", "details"}}``."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+
+class APIError(Exception):
+    def __init__(self, status_code: int, code: str, message: str,
+                 details: Any | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
+        self.message = message
+        self.details = details
+
+
+def not_found(entity: str, ident: object) -> APIError:
+    return APIError(404, "not_found", f"{entity} {ident} not found")
+
+
+def conflict(message: str, details: Any | None = None) -> APIError:
+    return APIError(409, "conflict", message, details)
+
+
+def bad_request(message: str, details: Any | None = None) -> APIError:
+    return APIError(400, "bad_request", message, details)
+
+
+def _body(code: str, message: str, details: Any | None = None) -> dict[str, Any]:
+    return {"error": {"code": code, "message": message, "details": details}}
+
+
+def install_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(APIError)
+    async def _api_error(_: Request, exc: APIError) -> JSONResponse:
+        return JSONResponse(_body(exc.code, exc.message, exc.details), status_code=exc.status_code)
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:
+        details = [{"loc": list(e.get("loc", [])), "msg": e.get("msg"), "type": e.get("type")}
+                   for e in exc.errors()]
+        return JSONResponse(_body("validation_error", "request validation failed", details),
+                            status_code=422)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _http(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+        code = {404: "not_found", 405: "method_not_allowed", 401: "unauthorized",
+                429: "rate_limited"}.get(exc.status_code, "http_error")
+        return JSONResponse(_body(code, str(exc.detail)), status_code=exc.status_code,
+                            headers=getattr(exc, "headers", None))

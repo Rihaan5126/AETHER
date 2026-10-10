@@ -204,7 +204,9 @@ def _by_id(evals: Sequence[AgentEvaluation], specs: Sequence[AgentSpec]) -> list
 def _clone_eval(ev: AgentEvaluation, agent_id: str) -> AgentEvaluation:
     from dataclasses import replace  # noqa: PLC0415
 
-    return replace(ev, agent_id=agent_id, rank=None, score=None, score_components={})
+    cached_from = None if ev.agent_id == agent_id else (ev.cached_from or ev.agent_id)
+    return replace(ev, agent_id=agent_id, rank=None, score=None, score_components={},
+                   cached_from=cached_from)
 
 
 def _next_population(

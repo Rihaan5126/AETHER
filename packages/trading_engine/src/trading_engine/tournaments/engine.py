@@ -100,6 +100,7 @@ class AgentEvaluation:
     rank: int | None = None
     error: str | None = None
     wall_seconds: float = 0.0
+    cached_from: str | None = None  # set when an identical (genome, seed) was evaluated before
 
 
 @dataclass
@@ -168,12 +169,17 @@ def stitch(results: Sequence[SimulationResult], initial: float) -> SimulationRes
     return SimulationResult(equity, trades, rejected, events, first.config, first.risk)
 
 
+class EvaluationAborted(Exception):  # noqa: N818 - control-flow signal, not an error
+    """Raised by an ``on_fold`` callback to stop evaluating an agent (e.g. pruning)."""
+
+
 def evaluate_agent(
     spec: AgentSpec,
     dev: DevelopmentData,
     folds: Sequence[Fold],
     cfg: EvaluationConfig,
     benchmark: Sequence[SimulationResult] | None = None,
+    on_fold: Callable[[int, dict[str, Any]], None] | None = None,
 ) -> AgentEvaluation:
     started = time.perf_counter()
     ev = AgentEvaluation(
@@ -191,6 +197,8 @@ def evaluate_agent(
             ev.fold_metrics.append({"fold": fold.number, **fold.to_dict(), **m.to_dict()})
             ev.fold_training.append({"fold": fold.number, **_jsonable(training)})
             results.append(res)
+            if on_fold:
+                on_fold(fold.number, ev.fold_metrics[-1])
         stitched = stitch(results, cfg.execution.initial_capital)
         bench_stitched = stitch(bench, cfg.execution.initial_capital)
         trips = [t for r in results for t in round_trips(r)]
@@ -208,6 +216,8 @@ def evaluate_agent(
         ev.rejected_orders = len(stitched.rejected_orders)
         ev.risk_events = stitched.risk_events[:500]
         ev.status = "evaluated"
+    except EvaluationAborted:
+        raise
     except Exception as exc:  # recorded, never swallowed: shows up as an excluded agent
         ev.error = f"{type(exc).__name__}: {exc}"
         ev.status = "failed"

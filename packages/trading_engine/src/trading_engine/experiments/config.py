@@ -30,6 +30,8 @@ class ExperimentConfig(BaseModel):
     evaluation: EvaluationConfig = EvaluationConfig()
     evolution: EvolutionConfig = EvolutionConfig()
     max_workers: int = Field(1, ge=1, le=8)
+    # Explicit agent list for a single-tournament experiment (no evolution).
+    agents: list[dict[str, Any]] | None = Field(None, max_length=32)
 
     @model_validator(mode="after")
     def _dates(self) -> ExperimentConfig:
