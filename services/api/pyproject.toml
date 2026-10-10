@@ -17,6 +17,9 @@ dependencies = [
   "psutil>=6.0",
 ]
 
+[project.scripts]
+aether = "aether_api.cli:main"
+
 [tool.uv.sources]
 trading-engine = { workspace = true }
 
