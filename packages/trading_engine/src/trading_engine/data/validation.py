@@ -132,15 +132,17 @@ def _clean(
     bad_adj = ~work["adjustment"].isin(ADJUSTMENT_VALUES)
     if bad_adj.any():
         report.add(
-            ValidationIssue("error", "invalid_adjustment", "unknown adjustment label", None,
-                            int(bad_adj.sum()))
+            ValidationIssue(
+                "error", "invalid_adjustment", "unknown adjustment label", None, int(bad_adj.sum())
+            )
         )
 
     drop = pd.Series(False, index=work.index)
     for code, mask in _row_problems(work).items():
         for symbol, count in work.loc[mask, "symbol"].value_counts().items():
-            report.add(ValidationIssue("error", code, f"{count} rows with {code}", str(symbol),
-                                       int(count)))
+            report.add(
+                ValidationIssue("error", code, f"{count} rows with {code}", str(symbol), int(count))
+            )
         drop |= mask
     drop |= bad_adj
 
@@ -149,8 +151,15 @@ def _clean(
     if dup_all.any():
         exact_dup = work.duplicated(keep="first")
         if exact_dup.any():
-            report.add(ValidationIssue("warning", "exact_duplicate",
-                                       "exact duplicate rows removed", None, int(exact_dup.sum())))
+            report.add(
+                ValidationIssue(
+                    "warning",
+                    "exact_duplicate",
+                    "exact duplicate rows removed",
+                    None,
+                    int(exact_dup.sum()),
+                )
+            )
         drop |= exact_dup
         remaining = work.loc[~exact_dup]
         conflict_keys = remaining.loc[remaining.duplicated(key, keep=False), key]
@@ -158,9 +167,15 @@ def _clean(
             conflict = work.set_index(key).index.isin(
                 pd.MultiIndex.from_frame(conflict_keys.drop_duplicates())
             )
-            report.add(ValidationIssue("error", "conflicting_duplicate",
-                                       "conflicting rows for the same session were dropped",
-                                       None, int(conflict.sum())))
+            report.add(
+                ValidationIssue(
+                    "error",
+                    "conflicting_duplicate",
+                    "conflicting rows for the same session were dropped",
+                    None,
+                    int(conflict.sum()),
+                )
+            )
             drop |= pd.Series(conflict, index=work.index)
 
     clean = work.loc[~drop].sort_values(key, kind="mergesort").reset_index(drop=True)
@@ -182,8 +197,11 @@ def _calendar_checks(clean: pd.DataFrame, report: ValidationReport) -> None:
         return
     weekend = clean["timestamp"].dt.dayofweek >= 5
     if weekend.any():
-        report.add(ValidationIssue("warning", "weekend_session", "rows dated on a weekend", None,
-                                   int(weekend.sum())))
+        report.add(
+            ValidationIssue(
+                "warning", "weekend_session", "rows dated on a weekend", None, int(weekend.sum())
+            )
+        )
     calendar = pd.DatetimeIndex(clean["timestamp"].unique()).sort_values()
     global_end = calendar.max()
     for symbol, sub in clean.groupby("symbol", sort=True):
@@ -191,23 +209,47 @@ def _calendar_checks(clean: pd.DataFrame, report: ValidationReport) -> None:
         span = calendar[(calendar >= dates.min()) & (calendar <= dates.max())]
         missing = span.difference(dates)
         if len(missing):
-            report.add(ValidationIssue("warning", "calendar_misalignment",
-                                       f"{len(missing)} sessions present for other symbols are "
-                                       "missing", str(symbol), len(missing)))
-        bdays = np.busday_count(dates[:-1].values.astype("datetime64[D]"),
-                                dates[1:].values.astype("datetime64[D]"))
+            report.add(
+                ValidationIssue(
+                    "warning",
+                    "calendar_misalignment",
+                    f"{len(missing)} sessions present for other symbols are missing",
+                    str(symbol),
+                    len(missing),
+                )
+            )
+        bdays = np.busday_count(
+            dates[:-1].values.astype("datetime64[D]"), dates[1:].values.astype("datetime64[D]")
+        )
         long_gaps = int((bdays > 5).sum())
         if long_gaps:
-            report.add(ValidationIssue("warning", "long_gap",
-                                       "gaps longer than 5 sessions (halt or outage?)",
-                                       str(symbol), long_gaps))
+            report.add(
+                ValidationIssue(
+                    "warning",
+                    "long_gap",
+                    "gaps longer than 5 sessions (halt or outage?)",
+                    str(symbol),
+                    long_gaps,
+                )
+            )
         if dates.max() < global_end - pd.Timedelta(days=10):
-            report.add(ValidationIssue("warning", "ends_early",
-                                       f"series ends {dates.max().date()} before dataset end "
-                                       "(possible delisting)", str(symbol)))
+            report.add(
+                ValidationIssue(
+                    "warning",
+                    "ends_early",
+                    f"series ends {dates.max().date()} before dataset end (possible delisting)",
+                    str(symbol),
+                )
+            )
         rets = sub["close"].pct_change().abs()
         jumps = int((rets > 0.4).sum())
         if jumps:
-            report.add(ValidationIssue("warning", "extreme_return",
-                                       "daily moves above 40% (unadjusted split?)", str(symbol),
-                                       jumps))
+            report.add(
+                ValidationIssue(
+                    "warning",
+                    "extreme_return",
+                    "daily moves above 40% (unadjusted split?)",
+                    str(symbol),
+                    jumps,
+                )
+            )

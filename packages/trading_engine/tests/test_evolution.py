@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 import trading_engine.tournaments.engine as engine_mod
 from trading_engine.agents import create_agent, default_genome, parse_genome
+from trading_engine.agents.genomes import GENOME_TYPES
 from trading_engine.evolution import (
     EvolutionConfig,
     crossover,
@@ -13,13 +13,17 @@ from trading_engine.evolution import (
     random_genome,
     run_evolution,
 )
-from trading_engine.agents.genomes import GENOME_TYPES
-from trading_engine.tournaments import EvaluationConfig, run_tournament, AgentSpec
+from trading_engine.tournaments import AgentSpec, EvaluationConfig, run_tournament
 from trading_engine.training import WalkForwardConfig
 
 FAST_EVAL = EvaluationConfig(walk_forward=WalkForwardConfig(n_folds=2))
-SMALL = EvolutionConfig(population_size=4, generations=2, elite_count=1, immigrant_count=1,
-                        families=("momentum", "xgboost"))
+SMALL = EvolutionConfig(
+    population_size=4,
+    generations=2,
+    elite_count=1,
+    immigrant_count=1,
+    families=("momentum", "xgboost"),
+)
 
 
 @pytest.mark.parametrize("family", ["momentum", "random_forest", "xgboost", "mlp", "random"])
@@ -78,15 +82,16 @@ def test_elite_is_preserved_with_identical_score(evolution):
     gen1 = {e.agent_id: e for e in evolution.generations[1].outcome.evaluations}
     elites = [r for r in evolution.generations[1].lineage if r.operation == "elite"]
     assert elites
-    best0 = [e for e in evolution.generations[0].outcome.evaluations if e.status == "eligible"][0]
+    best0 = next(e for e in evolution.generations[0].outcome.evaluations if e.status == "eligible")
     assert elites[0].parent_ids == [best0.agent_id]
     assert elites[0].genome_after == best0.genome
     assert gen1[elites[0].child_id].score == pytest.approx(gen0[best0.agent_id].score)
 
 
 def test_benchmarks_never_reproduce(evolution):
-    bench_ids = {e.agent_id for g in evolution.generations for e in g.outcome.evaluations
-                 if e.is_benchmark}
+    bench_ids = {
+        e.agent_id for g in evolution.generations for e in g.outcome.evaluations if e.is_benchmark
+    }
     for rec in evolution.lineage:
         assert not set(rec.parent_ids) & bench_ids
 
@@ -137,8 +142,10 @@ def test_tournament_and_evolution_refuse_test_data(dev_test):
 
 def test_tournament_ranking_policy(dev_test):
     dev, _ = dev_test
-    specs = [AgentSpec(f"a{i}", default_genome(f), 1)
-             for i, f in enumerate(["momentum", "random", "buy_and_hold", "xgboost"])]
+    specs = [
+        AgentSpec(f"a{i}", default_genome(f), 1)
+        for i, f in enumerate(["momentum", "random", "buy_and_hold", "xgboost"])
+    ]
     out = run_tournament(specs, dev, FAST_EVAL)
     ranks = [e.rank for e in out.evaluations]
     assert ranks == list(range(1, 5))
@@ -148,8 +155,12 @@ def test_tournament_ranking_policy(dev_test):
         assert len(e.fold_metrics) == 2
         if e.status != "excluded":
             comps = e.score_components
-            total = (comps["mean_fold_sharpe"] + comps["stability_penalty"]
-                     + comps["drawdown_penalty"] + comps["turnover_penalty"])
+            total = (
+                comps["mean_fold_sharpe"]
+                + comps["stability_penalty"]
+                + comps["drawdown_penalty"]
+                + comps["turnover_penalty"]
+            )
             assert e.score == pytest.approx(total)
     assert {e.status for e in out.evaluations if e.is_benchmark} == {"benchmark"}
     bh = next(e for e in out.evaluations if e.family == "buy_and_hold")

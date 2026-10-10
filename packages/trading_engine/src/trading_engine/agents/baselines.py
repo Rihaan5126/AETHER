@@ -70,8 +70,7 @@ class MomentumAgent(BaseTradingAgent):
         cross = (fast > slow).astype(float).where(slow.notna())
         tsmom = (close.pct_change(g.trend_lookback, fill_method=None) > 0).astype(float)
         tsmom = tsmom.where(close.shift(g.trend_lookback).notna())
-        signal = {"ma_cross": cross, "time_series_momentum": tsmom,
-                  "both": cross * tsmom}[g.rule]
+        signal = {"ma_cross": cross, "time_series_momentum": tsmom, "both": cross * tsmom}[g.rule]
         return signal.reindex(observations.features.index)
 
     def position_policy(self, forecast: pd.Series) -> pd.Series:

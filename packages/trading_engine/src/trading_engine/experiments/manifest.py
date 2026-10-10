@@ -20,8 +20,17 @@ from typing import Any
 from trading_engine.experiments.config import ExperimentConfig
 
 MANIFEST_VERSION = 1
-TRACKED_PACKAGES = ("trading-engine", "numpy", "pandas", "pyarrow", "scikit-learn", "xgboost",
-                    "torch", "pydantic", "optuna")
+TRACKED_PACKAGES = (
+    "trading-engine",
+    "numpy",
+    "pandas",
+    "pyarrow",
+    "scikit-learn",
+    "xgboost",
+    "torch",
+    "pydantic",
+    "optuna",
+)
 
 
 def code_version() -> str:
@@ -30,13 +39,23 @@ def code_version() -> str:
         return env
     try:
         root = Path(__file__).resolve().parents[4]
-        out = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True,
-                             text=True, timeout=5, check=False)
+        out = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
         sha = out.stdout.strip()
         if out.returncode != 0 or not sha:
             return "unknown"
-        dirty = subprocess.run(["git", "-C", str(root), "status", "--porcelain"],
-                               capture_output=True, text=True, timeout=5, check=False).stdout
+        dirty = subprocess.run(
+            ["git", "-C", str(root), "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        ).stdout
         return f"{sha}{'-dirty' if dirty.strip() else ''}"
     except (OSError, subprocess.SubprocessError):
         return "unknown"

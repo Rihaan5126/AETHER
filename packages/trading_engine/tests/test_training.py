@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import itertools
+
 import numpy as np
 import pandas as pd
 import pytest
-
 from trading_engine.training import (
     DevelopmentData,
     MarketFrame,
@@ -46,7 +47,7 @@ def test_walk_forward_folds_are_chronological_and_purged(dev_test):
     cfg = WalkForwardConfig(n_folds=3, embargo_bars=5, horizon=1)
     folds = walk_forward_folds(dev, cfg)
     assert len(folds) == 3
-    for prev, nxt in zip(folds, folds[1:], strict=False):
+    for prev, nxt in itertools.pairwise(folds):
         assert prev.val_stop <= nxt.val_start
     for fold in folds:
         # last training label window (t+1+h) ends strictly before validation starts
@@ -65,10 +66,9 @@ def test_training_labels_do_not_see_validation_prices(dev_test):
     fold = walk_forward_folds(dev, WalkForwardConfig())[0]
     X, y = training_matrix(dev, fold.train_positions, horizon=1, label_cutoff=fold.val_start)
     poisoned_bars = dev.bars.copy()
-    poisoned_bars.iloc[fold.val_start:] *= 10
+    poisoned_bars.iloc[fold.val_start :] *= 10
     poisoned = MarketFrame(dev.symbol, poisoned_bars, dev.features)
-    X2, y2 = training_matrix(poisoned, fold.train_positions, horizon=1,
-                             label_cutoff=fold.val_start)
+    X2, y2 = training_matrix(poisoned, fold.train_positions, horizon=1, label_cutoff=fold.val_start)
     pd.testing.assert_series_equal(y, y2)
     pd.testing.assert_frame_equal(X, X2)
     assert X.index.max() < dev.index[fold.val_start]

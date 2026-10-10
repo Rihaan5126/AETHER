@@ -6,10 +6,10 @@ import hashlib
 from pathlib import Path
 
 import pandas as pd
-
-from aether_api.core.config import get_settings
 from trading_engine.data import DatasetStore
 from trading_engine.storage import LocalArtifactStore, safe_key, sha256_file
+
+from aether_api.core.config import get_settings
 
 
 def dataset_store() -> DatasetStore:

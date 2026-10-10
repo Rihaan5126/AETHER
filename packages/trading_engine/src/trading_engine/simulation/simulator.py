@@ -139,14 +139,17 @@ def simulate(
             pending = None
             ref = opens[i]
             if not math.isfinite(ref) or ref <= 0:
-                rejected.append(RejectedOrder(_fmt(dates[i], EXECUTION_TIME), target,
-                                              "missing_market_data"))
+                rejected.append(
+                    RejectedOrder(_fmt(dates[i], EXECUTION_TIME), target, "missing_market_data")
+                )
             else:
-                trade, reason = _execute(cash, qty, target, ref, fee_rate, cfg.fee_fixed, slip,
-                                         cfg.fractional_shares)
+                trade, reason = _execute(
+                    cash, qty, target, ref, fee_rate, cfg.fee_fixed, slip, cfg.fractional_shares
+                )
                 if trade is None:
-                    rejected.append(RejectedOrder(_fmt(dates[i], EXECUTION_TIME), target,
-                                                  reason or "rejected"))
+                    rejected.append(
+                        RejectedOrder(_fmt(dates[i], EXECUTION_TIME), target, reason or "rejected")
+                    )
                 else:
                     side, dq, fill, fee = trade
                     notional = abs(dq) * fill
@@ -162,14 +165,23 @@ def simulate(
                         cash = 0.0
                     if cash < 0:
                         raise AssertionError("simulator produced negative cash")
-                    trades.append(Trade(
-                        signal_time=_fmt(dates[decided_at], SIGNAL_TIME),
-                        submitted_time=_fmt(dates[decided_at], SIGNAL_TIME),
-                        executed_time=_fmt(dates[i], EXECUTION_TIME),
-                        side=side, quantity=dq, reference_price=ref, fill_price=fill,
-                        notional=notional, fee=fee, slippage_cost=abs(fill - ref) * dq,
-                        target_weight=target, position_after=qty, cash_after=cash,
-                    ))
+                    trades.append(
+                        Trade(
+                            signal_time=_fmt(dates[decided_at], SIGNAL_TIME),
+                            submitted_time=_fmt(dates[decided_at], SIGNAL_TIME),
+                            executed_time=_fmt(dates[i], EXECUTION_TIME),
+                            side=side,
+                            quantity=dq,
+                            reference_price=ref,
+                            fill_price=fill,
+                            notional=notional,
+                            fee=fee,
+                            slippage_cost=abs(fill - ref) * dq,
+                            target_weight=target,
+                            position_after=qty,
+                            cash_after=cash,
+                        )
+                    )
 
         # ---- VALUATION at close(i) ------------------------------------------------
         px = closes[i]
@@ -177,8 +189,11 @@ def simulate(
             last_close = px
         else:
             stale_days += 1
-        mark = last_close if math.isfinite(last_close) else (opens[i] if math.isfinite(opens[i])
-                                                              else 0.0)
+        mark = (
+            last_close
+            if math.isfinite(last_close)
+            else (opens[i] if math.isfinite(opens[i]) else 0.0)
+        )
         position_value = qty * mark
         equity = cash + position_value
         peak = max(peak, equity)
@@ -188,18 +203,28 @@ def simulate(
         # ---- DECISION after close(i) ---------------------------------------------
         if i == len(bars) - 1:
             break  # no next session to execute in
-        snapshot = PortfolioSnapshot(equity=equity, peak_equity=peak, current_weight=weight,
-                                     realised_vol=vols[i] if math.isfinite(vols[i]) else None)
+        snapshot = PortfolioSnapshot(
+            equity=equity,
+            peak_equity=peak,
+            current_weight=weight,
+            realised_vol=vols[i] if math.isfinite(vols[i]) else None,
+        )
         decision = manager.review(float(weights[i]), snapshot)
         for ev in decision.events:
-            risk_events.append({"time": _fmt(dates[i], SIGNAL_TIME), "code": ev.code,
-                                "message": ev.message, "proposed_weight": ev.proposed_weight,
-                                "approved_weight": ev.approved_weight})
+            risk_events.append(
+                {
+                    "time": _fmt(dates[i], SIGNAL_TIME),
+                    "code": ev.code,
+                    "message": ev.message,
+                    "proposed_weight": ev.proposed_weight,
+                    "approved_weight": ev.approved_weight,
+                }
+            )
         target = decision.approved_weight
         full_exit = target == 0.0 and qty > 0
-        if full_exit or abs(target - weight) >= max(cfg.min_rebalance_weight, 1e-9):
-            if not (target == 0.0 and qty == 0.0):
-                pending = (target, i)
+        rebalance = full_exit or abs(target - weight) >= max(cfg.min_rebalance_weight, 1e-9)
+        if rebalance and not (target == 0.0 and qty == 0.0):
+            pending = (target, i)
 
     equity_frame = pd.DataFrame(
         rows,
@@ -207,8 +232,9 @@ def simulate(
         index=dates[: len(rows)],
     )
     equity_frame.index.name = "timestamp"
-    return SimulationResult(equity_frame, trades, rejected, risk_events, cfg, risk_cfg,
-                            stale_price_days=stale_days)
+    return SimulationResult(
+        equity_frame, trades, rejected, risk_events, cfg, risk_cfg, stale_price_days=stale_days
+    )
 
 
 def _execute(

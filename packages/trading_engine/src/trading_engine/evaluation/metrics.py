@@ -94,8 +94,15 @@ def round_trips(result: SimulationResult) -> list[RoundTrip]:
         if entry is not None and t.position_after == 0.0:
             start = index.get(pd.Timestamp(entry).normalize(), 0)
             stop = index.get(pd.Timestamp(t.executed_time).normalize(), start)
-            trips.append(RoundTrip(entry, t.executed_time, flow,
-                                   flow / invested if invested > 0 else 0.0, stop - start))
+            trips.append(
+                RoundTrip(
+                    entry,
+                    t.executed_time,
+                    flow,
+                    flow / invested if invested > 0 else 0.0,
+                    stop - start,
+                )
+            )
             entry = None
     return trips
 
@@ -121,13 +128,15 @@ def compute_metrics(
     ann_vol = std * math.sqrt(TRADING_DAYS_PER_YEAR) if enough else None
     sharpe = (
         float(rets.mean()) / std * math.sqrt(TRADING_DAYS_PER_YEAR)
-        if enough and std > _EPS else None
+        if enough and std > _EPS
+        else None
     )
     downside = np.minimum(rets.to_numpy(), 0.0)
     dd_dev = math.sqrt(float(np.mean(downside**2))) if n else 0.0
     sortino = (
         float(rets.mean()) / dd_dev * math.sqrt(TRADING_DAYS_PER_YEAR)
-        if enough and dd_dev > _EPS else None
+        if enough and dd_dev > _EPS
+        else None
     )
     mdd = float(-drawdown_series(pd.concat([pd.Series([initial]), eq])).min()) if n else 0.0
     calmar = ann_ret / mdd if ann_ret is not None and mdd > _EPS else None

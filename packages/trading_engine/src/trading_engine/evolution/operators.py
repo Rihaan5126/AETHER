@@ -11,7 +11,7 @@ Every applied change is described in plain text for the lineage record.
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from annotated_types import Ge, Le
@@ -19,6 +19,7 @@ from pydantic import BaseModel, ValidationError
 
 from trading_engine.agents.genomes import (
     GENOME_TYPES,
+    Genome,
     MLPGenome,
     MomentumGenome,
     PositionPolicy,
@@ -39,12 +40,24 @@ def numeric_genes(model: type[BaseModel]) -> dict[str, tuple[float, float, bool,
             continue
         lo = next(m.ge for m in info.metadata if isinstance(m, Ge))
         hi = next(m.le for m in info.metadata if isinstance(m, Le))
-        genes[name] = (float(lo), float(hi), bool(extra.get("log")), info.annotation is int)
+        genes[name] = (
+            float(cast(float, lo)),
+            float(cast(float, hi)),
+            bool(extra.get("log")),
+            info.annotation is int,
+        )
     return genes
 
 
-def _step(value: float, lo: float, hi: float, log: bool, is_int: bool,
-          rng: np.random.Generator, strength: float) -> float:
+def _step(
+    value: float,
+    lo: float,
+    hi: float,
+    log: bool,
+    is_int: bool,
+    rng: np.random.Generator,
+    strength: float,
+) -> float:
     if log:
         span = math.log(hi) - math.log(lo)
         new = math.exp(math.log(value) + rng.normal(0, strength * span))
@@ -52,7 +65,7 @@ def _step(value: float, lo: float, hi: float, log: bool, is_int: bool,
         new = value + rng.normal(0, strength * (hi - lo))
     new = min(max(new, lo), hi)
     if is_int:
-        new = int(round(new))
+        new = round(new)
         if new == int(value):
             new = int(min(max(value + (1 if rng.random() < 0.5 else -1), lo), hi))
     return new
@@ -60,15 +73,20 @@ def _step(value: float, lo: float, hi: float, log: bool, is_int: bool,
 
 def _sample(lo: float, hi: float, log: bool, is_int: bool, rng: np.random.Generator) -> float:
     v = math.exp(rng.uniform(math.log(lo), math.log(hi))) if log else rng.uniform(lo, hi)
-    return int(round(v)) if is_int else v
+    return round(v) if is_int else v
 
 
 def _fmt(v: Any) -> str:
     return f"{v:.4g}" if isinstance(v, float) else str(v)
 
 
-def _mutate_numeric(data: dict[str, Any], model: type[BaseModel], rng: np.random.Generator,
-                    strength: float, prefix: str = "") -> list[str] | None:
+def _mutate_numeric(
+    data: dict[str, Any],
+    model: type[BaseModel],
+    rng: np.random.Generator,
+    strength: float,
+    prefix: str = "",
+) -> list[str] | None:
     genes = numeric_genes(model)
     if not genes:
         return None
@@ -114,14 +132,16 @@ def _mutate_layers(data: dict[str, Any], rng: np.random.Generator) -> list[str]:
         layers.pop()
     else:
         i = int(rng.integers(len(layers)))
-        layers[i] = int(min(max(round(layers[i] * float(rng.choice([0.5, 0.75, 1.5, 2.0]))), 4),
-                            256))
+        layers[i] = int(
+            min(max(round(layers[i] * float(rng.choice([0.5, 0.75, 1.5, 2.0]))), 4), 256)
+        )
     data["hidden_layers"] = layers
     return [f"hidden_layers: {old} -> {tuple(layers)}"]
 
 
-def mutate(genome: BaseModel, rng: np.random.Generator, *, strength: float = 0.15,
-           n_changes: int = 1) -> tuple[BaseModel, list[str]]:
+def mutate(
+    genome: BaseModel, rng: np.random.Generator, *, strength: float = 0.15, n_changes: int = 1
+) -> tuple[BaseModel, list[str]]:
     """Return a valid mutated copy of ``genome`` and a description of the changes."""
     model = type(genome)
     for _ in range(MAX_ATTEMPTS):
@@ -138,8 +158,9 @@ def mutate(genome: BaseModel, rng: np.random.Generator, *, strength: float = 0.1
     return genome, ["no valid mutation found; genome unchanged"]
 
 
-def _one_mutation(data: dict[str, Any], model: type[BaseModel], rng: np.random.Generator,
-                  strength: float) -> list[str]:
+def _one_mutation(
+    data: dict[str, Any], model: type[BaseModel], rng: np.random.Generator, strength: float
+) -> list[str]:
     ops: list[str] = ["numeric"]
     if issubclass(model, _LearnedGenome):
         ops += ["features", "policy", "train_window"]
@@ -193,7 +214,7 @@ def crossover(a: BaseModel, b: BaseModel, rng: np.random.Generator) -> tuple[Bas
     return a, ["crossover produced no valid child; copied parent A"]
 
 
-def random_genome(family: str, rng: np.random.Generator) -> BaseModel:
+def random_genome(family: str, rng: np.random.Generator) -> Genome:
     """Sample a genome uniformly within its bounds (used for immigrants and diversity)."""
     model = GENOME_TYPES[family]
     for _ in range(MAX_ATTEMPTS):
@@ -204,8 +225,10 @@ def random_genome(family: str, rng: np.random.Generator) -> BaseModel:
             names = feature_names()
             k = int(rng.integers(6, len(names) + 1))
             data["features"] = sorted(rng.choice(names, size=k, replace=False).tolist())
-            pol = {n: _sample(lo, hi, log, is_int, rng)
-                   for n, (lo, hi, log, is_int) in numeric_genes(PositionPolicy).items()}
+            pol: dict[str, Any] = {
+                n: _sample(lo, hi, log, is_int, rng)
+                for n, (lo, hi, log, is_int) in numeric_genes(PositionPolicy).items()
+            }
             pol["threshold"] = float(rng.uniform(0.48, 0.58))
             pol["sizing"] = "binary" if rng.random() < 0.7 else "proportional"
             data["policy"] = pol

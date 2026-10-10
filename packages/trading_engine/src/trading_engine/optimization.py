@@ -14,7 +14,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import optuna
@@ -62,16 +62,22 @@ class OptimizationResult:
 def _suggest(trial: optuna.Trial, family: str) -> dict[str, Any]:
     params: dict[str, Any] = {"family": family}
     for name, (lo, hi, log, is_int) in numeric_genes(GENOME_TYPES[family]).items():
-        params[name] = (trial.suggest_int(name, int(lo), int(hi), log=log) if is_int
-                        else trial.suggest_float(name, lo, hi, log=log))
+        params[name] = (
+            trial.suggest_int(name, int(lo), int(hi), log=log)
+            if is_int
+            else trial.suggest_float(name, lo, hi, log=log)
+        )
     if family == "momentum":
-        params["rule"] = trial.suggest_categorical("rule", ["ma_cross", "time_series_momentum",
-                                                            "both"])
+        params["rule"] = trial.suggest_categorical(
+            "rule", ["ma_cross", "time_series_momentum", "both"]
+        )
         if params["fast_window"] >= params["slow_window"]:
             raise optuna.TrialPruned("invalid window ordering")
     else:
-        policy = {"threshold": trial.suggest_float("policy.threshold", 0.45, 0.62),
-                  "sizing": trial.suggest_categorical("policy.sizing", ["binary", "proportional"])}
+        policy = {
+            "threshold": trial.suggest_float("policy.threshold", 0.45, 0.62),
+            "sizing": trial.suggest_categorical("policy.sizing", ["binary", "proportional"]),
+        }
         lo, hi, _, _ = numeric_genes(PositionPolicy)["max_allocation"]
         policy["max_allocation"] = trial.suggest_float("policy.max_allocation", lo, hi)
         params["policy"] = policy
@@ -115,8 +121,14 @@ def optimize(
                     raise EvaluationAborted
 
         try:
-            ev = evaluate_agent(AgentSpec(f"trial-{trial.number}", genome, config.seed),
-                                dev, folds, evaluation, bench, on_fold=on_fold)
+            ev = evaluate_agent(
+                AgentSpec(f"trial-{trial.number}", genome, config.seed),
+                dev,
+                folds,
+                evaluation,
+                bench,
+                on_fold=on_fold,
+            )
         except EvaluationAborted:
             _record(trial, "pruned", None, fold_scores, started, genome)
             raise optuna.TrialPruned() from None
@@ -128,11 +140,24 @@ def optimize(
         _record(trial, "complete", value, fold_scores, started, genome)
         return value
 
-    def _record(trial: optuna.Trial, state: str, value: float | None, scores: list[float],
-                started: float, genome: Any, error: str | None = None) -> None:
-        rec = TrialRecord(trial.number, state, genome_to_dict(genome), value,
-                          [round(s, 6) for s in scores], round(time.perf_counter() - started, 3),
-                          error)
+    def _record(
+        trial: optuna.Trial,
+        state: str,
+        value: float | None,
+        scores: list[float],
+        started: float,
+        genome: Any,
+        error: str | None = None,
+    ) -> None:
+        rec = TrialRecord(
+            trial.number,
+            state,
+            genome_to_dict(genome),
+            value,
+            [round(s, 6) for s in scores],
+            round(time.perf_counter() - started, 3),
+            error,
+        )
         records.append(rec)
         if on_trial:
             on_trial(rec)
@@ -143,20 +168,32 @@ def optimize(
         sampler=optuna.samplers.TPESampler(seed=config.seed),
         pruner=optuna.pruners.MedianPruner(n_startup_trials=3, n_warmup_steps=1),
     )
-    study.optimize(objective, n_trials=config.n_trials, timeout=config.timeout_seconds,
-                   catch=(RuntimeError, ValueError), n_jobs=1)
+    study.optimize(
+        objective,
+        n_trials=config.n_trials,
+        timeout=config.timeout_seconds,
+        catch=(RuntimeError, ValueError),
+        n_jobs=1,
+    )
     recorded = {r.number for r in records}
     for t in study.trials:  # trials that ended before evaluation (invalid params, errors)
         if t.number in recorded:
             continue
         state = "pruned" if t.state == optuna.trial.TrialState.PRUNED else "failed"
-        reason = "invalid parameter combination" if state == "pruned" else str(
-            t.system_attrs.get("fail_reason", "failed"))
+        reason = (
+            "invalid parameter combination"
+            if state == "pruned"
+            else str(t.system_attrs.get("fail_reason", "failed"))
+        )
         records.append(TrialRecord(t.number, state, dict(t.params), None, [], 0.0, reason))
     completed = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
     if not completed:
         return OptimizationResult(None, None, None, sorted(records, key=lambda r: r.number))
     best = study.best_trial
     best_rec = next(r for r in records if r.number == best.number)
-    return OptimizationResult(dict(best.params), float(np.round(best.value, 6)),
-                              best_rec.params, sorted(records, key=lambda r: r.number))
+    return OptimizationResult(
+        dict(best.params),
+        round(float(cast(float, best.value)), 6),
+        best_rec.params,
+        sorted(records, key=lambda r: r.number),
+    )

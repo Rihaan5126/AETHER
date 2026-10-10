@@ -4,8 +4,7 @@ import math
 
 import numpy as np
 import pytest
-from conftest import make_bars
-
+from bar_factory import make_bars
 from trading_engine.evaluation import compute_metrics, round_trips
 from trading_engine.risk import RiskConfig
 from trading_engine.simulation import ExecutionConfig, simulate
@@ -109,16 +108,24 @@ def test_risk_layer_clips_and_rejects():
 
 def test_turnover_limit_and_min_cash():
     bars = make_bars([100] * 5)
-    res = simulate(bars, np.ones(5), execution=NO_COST,
-                   risk=RiskConfig(max_daily_turnover=0.25, min_cash_fraction=0.1))
+    res = simulate(
+        bars,
+        np.ones(5),
+        execution=NO_COST,
+        risk=RiskConfig(max_daily_turnover=0.25, min_cash_fraction=0.1),
+    )
     assert [round(t.target_weight, 2) for t in res.trades] == [0.25, 0.5, 0.75, 0.9]
 
 
 def test_drawdown_circuit_breaker_forces_cash():
     prices = [100, 100, 60, 60, 60, 60]
     bars = make_bars(prices, prices)
-    res = simulate(bars, np.ones(6), execution=NO_COST,
-                   risk=RiskConfig(drawdown_circuit_breaker=0.3, breaker_cooldown_bars=2))
+    res = simulate(
+        bars,
+        np.ones(6),
+        execution=NO_COST,
+        risk=RiskConfig(drawdown_circuit_breaker=0.3, breaker_cooldown_bars=2),
+    )
     assert any(e["code"] == "circuit_breaker_tripped" for e in res.risk_events)
     assert res.trades[-1].side == "sell"
 
@@ -149,5 +156,6 @@ def test_metrics_undefined_cases_and_known_values():
     m = compute_metrics(simulate(bars, np.ones(30), execution=NO_COST))
     assert math.isclose(m.max_drawdown, 0.25)
     assert math.isclose(m.total_return, -0.10)
-    assert m.n_trades == 1 and m.n_round_trips == 0 and math.isclose(m.exposure,
-                                                                     29 / 30, rel_tol=1e-9)
+    assert (
+        m.n_trades == 1 and m.n_round_trips == 0 and math.isclose(m.exposure, 29 / 30, rel_tol=1e-9)
+    )

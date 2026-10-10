@@ -27,6 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from trading_engine.agents.genomes import (
     BuyAndHoldGenome,
+    Genome,
     RandomGenome,
     default_genome,
     genome_to_dict,
@@ -106,17 +107,18 @@ def _genome_key(genome: BaseModel, seed: int) -> str:
     return hashlib.sha256(blob.encode()).hexdigest()
 
 
-def initial_population(config: EvolutionConfig, rng: np.random.Generator) -> list[BaseModel]:
+def initial_population(config: EvolutionConfig, rng: np.random.Generator) -> list[Genome]:
     """Default genome for each family first, then random genomes for diversity."""
-    pop: list[BaseModel] = [default_genome(f) for f in config.families][: config.population_size]
+    pop: list[Genome] = [default_genome(f) for f in config.families][: config.population_size]
     while len(pop) < config.population_size:
         family = config.families[len(pop) % len(config.families)]
         pop.append(random_genome(family, rng))
     return pop
 
 
-def tournament_select(ranked: Sequence[AgentEvaluation], k: int,
-                      rng: np.random.Generator) -> AgentEvaluation:
+def tournament_select(
+    ranked: Sequence[AgentEvaluation], k: int, rng: np.random.Generator
+) -> AgentEvaluation:
     """Pick ``k`` random contenders; the best-ranked one wins."""
     idx = rng.choice(len(ranked), size=min(k, len(ranked)), replace=False)
     return min((ranked[int(i)] for i in idx), key=lambda e: e.rank or 10**9)
@@ -147,9 +149,10 @@ def run_evolution(
     population: list[tuple[BaseModel, int, LineageRecord]] = []
     for i, genome in enumerate(initial_population(config, rng)):
         s = new_seed()
-        cid = make_id(0, i, genome.family)  # type: ignore[attr-defined]
-        population.append((genome, s, LineageRecord(cid, 0, "initial", [], [], None,
-                                                    genome_to_dict(genome), s)))
+        cid = make_id(0, i, genome.family)
+        population.append(
+            (genome, s, LineageRecord(cid, 0, "initial", [], [], None, genome_to_dict(genome), s))
+        )
 
     bench_seed = int(seed)
     for gen in range(config.generations):
@@ -158,11 +161,15 @@ def run_evolution(
         specs = [AgentSpec(rec.child_id, g, s) for g, s, rec in population]
         lineage = [rec for _, _, rec in population]
         if config.include_benchmarks:
-            for j, bg in enumerate((RandomGenome(), BuyAndHoldGenome())):
+            bench_genomes: tuple[Genome, ...] = (RandomGenome(), BuyAndHoldGenome())
+            for j, bg in enumerate(bench_genomes):
                 bid = make_id(gen, config.population_size + j, bg.family)
                 specs.append(AgentSpec(bid, bg, bench_seed))
-                lineage.append(LineageRecord(bid, gen, "benchmark", [], [], None,
-                                             genome_to_dict(bg), bench_seed))
+                lineage.append(
+                    LineageRecord(
+                        bid, gen, "benchmark", [], [], None, genome_to_dict(bg), bench_seed
+                    )
+                )
         # Re-use cached evaluations (elites, duplicates); evaluate the rest.
         todo = [s for s in specs if _genome_key(s.genome, s.seed) not in cache]
 
@@ -170,8 +177,14 @@ def run_evolution(
             if on_agent:
                 on_agent(_gen, done, total, ev)
 
-        outcome = run_tournament(todo, dev, evaluation, max_workers=max_workers,
-                                 on_progress=progress, should_cancel=should_cancel)
+        outcome = run_tournament(
+            todo,
+            dev,
+            evaluation,
+            max_workers=max_workers,
+            on_progress=progress,
+            should_cancel=should_cancel,
+        )
         for spec, ev in zip(todo, _by_id(outcome.evaluations, todo), strict=True):
             cache[_genome_key(spec.genome, spec.seed)] = ev
         evaluations = []
@@ -205,8 +218,9 @@ def _clone_eval(ev: AgentEvaluation, agent_id: str) -> AgentEvaluation:
     from dataclasses import replace  # noqa: PLC0415
 
     cached_from = None if ev.agent_id == agent_id else (ev.cached_from or ev.agent_id)
-    return replace(ev, agent_id=agent_id, rank=None, score=None, score_components={},
-                   cached_from=cached_from)
+    return replace(
+        ev, agent_id=agent_id, rank=None, score=None, score_components={}, cached_from=cached_from
+    )
 
 
 def _next_population(
@@ -226,12 +240,31 @@ def _next_population(
         candidates = [e for e in ranked if not e.is_benchmark]
     out: list[tuple[BaseModel, int, LineageRecord]] = []
 
-    def add(genome: BaseModel, s: int, op: str, parents: list[str], notes: list[str],
-            before: BaseModel | None) -> None:
+    def add(
+        genome: BaseModel,
+        s: int,
+        op: str,
+        parents: list[str],
+        notes: list[str],
+        before: BaseModel | None,
+    ) -> None:
         cid = make_id(gen, len(out), genome.family)  # type: ignore[attr-defined]
-        out.append((genome, s, LineageRecord(
-            cid, gen, op, parents, notes, genome_to_dict(before) if before else None,
-            genome_to_dict(genome), s)))
+        out.append(
+            (
+                genome,
+                s,
+                LineageRecord(
+                    cid,
+                    gen,
+                    op,
+                    parents,
+                    notes,
+                    genome_to_dict(before) if before else None,
+                    genome_to_dict(genome),
+                    s,
+                ),
+            )
+        )
 
     for elite in candidates[: config.elite_count]:
         sp = spec_by_id[elite.agent_id]
@@ -241,19 +274,27 @@ def _next_population(
     while len(out) < config.population_size - n_immigrants:
         parent = tournament_select(candidates, config.tournament_size, rng)
         pspec = spec_by_id[parent.agent_id]
-        same_family = [c for c in candidates
-                       if c.family == parent.family and c.agent_id != parent.agent_id]
+        same_family = [
+            c for c in candidates if c.family == parent.family and c.agent_id != parent.agent_id
+        ]
         if same_family and rng.random() < config.crossover_rate:
             mate = tournament_select(same_family, config.tournament_size, rng)
             mspec = spec_by_id[mate.agent_id]
             child, notes = crossover(pspec.genome, mspec.genome, rng)
             child, more = mutate(child, rng, strength=config.mutation_strength)
-            add(child, new_seed(), "crossover", [parent.agent_id, mate.agent_id], notes + more,
-                pspec.genome)
+            add(
+                child,
+                new_seed(),
+                "crossover",
+                [parent.agent_id, mate.agent_id],
+                notes + more,
+                pspec.genome,
+            )
         else:
             n_changes = 1 if rng.random() < 0.7 else 2
-            child, notes = mutate(pspec.genome, rng, strength=config.mutation_strength,
-                                  n_changes=n_changes)
+            child, notes = mutate(
+                pspec.genome, rng, strength=config.mutation_strength, n_changes=n_changes
+            )
             add(child, new_seed(), "mutation", [parent.agent_id], notes, pspec.genome)
     for _ in range(n_immigrants):
         family = config.families[int(rng.integers(len(config.families)))]

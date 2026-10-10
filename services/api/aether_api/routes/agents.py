@@ -36,7 +36,10 @@ def list_agents(
     items, total = paginate(db, q, page)
     return Page[AgentSummary](
         items=[AgentSummary.model_validate(s) for s in queries.list_agent_summaries(db, items)],
-        total=total, limit=page.limit, offset=page.offset)
+        total=total,
+        limit=page.limit,
+        offset=page.offset,
+    )
 
 
 @router.get("/{agent_id}", response_model=AgentDetail)
@@ -66,7 +69,8 @@ def agent_lineage(agent_id: str, db: Session = Depends(get_db)) -> LineageGraph:
                     stack.append(nxt)
     return LineageGraph(
         nodes=[n for n in graph["nodes"] if n["agent_id"] in keep],
-        edges=[e for e in graph["edges"] if e["parent_id"] in keep and e["child_id"] in keep])
+        edges=[e for e in graph["edges"] if e["parent_id"] in keep and e["child_id"] in keep],
+    )
 
 
 @router.get("/{agent_id}/metrics", response_model=AgentMetrics)

@@ -58,8 +58,9 @@ def score_components(ev: AgentEvaluation, policy: RankingPolicy) -> dict[str, fl
         "drawdown_penalty": -policy.drawdown_weight * mdd,
         "turnover_penalty": -policy.turnover_weight * turnover,
     }
-    comps["score"] = (mean + comps["stability_penalty"] + comps["drawdown_penalty"]
-                      + comps["turnover_penalty"])
+    comps["score"] = (
+        mean + comps["stability_penalty"] + comps["drawdown_penalty"] + comps["turnover_penalty"]
+    )
     return comps
 
 
@@ -79,8 +80,9 @@ def rank_evaluations(
             ev.status, ev.status_reason = "benchmark", "reference strategy; never selected"
         elif mdd > policy.max_drawdown_limit:
             ev.status = "excluded"
-            ev.status_reason = (f"max drawdown {mdd:.0%} exceeds limit "
-                                f"{policy.max_drawdown_limit:.0%}")
+            ev.status_reason = (
+                f"max drawdown {mdd:.0%} exceeds limit {policy.max_drawdown_limit:.0%}"
+            )
         elif ev.family != "buy_and_hold" and trips < policy.min_round_trips:
             ev.status = "insufficient_evidence"
             ev.status_reason = f"{trips} round trips < required {policy.min_round_trips}"
@@ -88,8 +90,11 @@ def rank_evaluations(
             ev.status, ev.status_reason = "eligible", "passed risk and evidence checks"
     ordered = sorted(
         evaluations,
-        key=lambda e: (STATUS_ORDER[e.status],
-                       -(e.score if e.score is not None else -np.inf), e.agent_id),
+        key=lambda e: (
+            STATUS_ORDER[e.status],
+            -(e.score if e.score is not None else -np.inf),
+            e.agent_id,
+        ),
     )
     for i, ev in enumerate(ordered, start=1):
         ev.rank = i

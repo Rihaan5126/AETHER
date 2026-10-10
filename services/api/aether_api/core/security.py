@@ -49,8 +49,7 @@ def require_write_access(
     x_api_key: str | None = Header(default=None),
     settings: Settings = Depends(get_settings),
 ) -> None:
-    if settings.api_key:
-        if not x_api_key or not hmac.compare_digest(x_api_key, settings.api_key):
-            raise APIError(401, "unauthorized", "missing or invalid X-API-Key")
+    if settings.api_key and (not x_api_key or not hmac.compare_digest(x_api_key, settings.api_key)):
+        raise APIError(401, "unauthorized", "missing or invalid X-API-Key")
     client = request.client.host if request.client else "unknown"
     rate_limiter.check(client, settings.write_rate_limit_per_minute)

@@ -21,8 +21,9 @@ from trading_engine.training.splits import training_matrix, usable_positions
 FEATURE_CACHE_VERSION = "v1"
 
 
-def load_features(store: DatasetStore, dataset_hash: str, symbol: str,
-                  bars: pd.DataFrame) -> pd.DataFrame:
+def load_features(
+    store: DatasetStore, dataset_hash: str, symbol: str, bars: pd.DataFrame
+) -> pd.DataFrame:
     """Compute features once per (dataset, symbol) and cache them as Parquet.
 
     The cache is keyed by dataset hash and feature-set version; datasets are
@@ -39,8 +40,9 @@ def load_features(store: DatasetStore, dataset_hash: str, symbol: str,
     return feats
 
 
-def prepare_market_data(store: DatasetStore, config: ExperimentConfig
-                        ) -> tuple[DevelopmentData, TestData]:
+def prepare_market_data(
+    store: DatasetStore, config: ExperimentConfig
+) -> tuple[DevelopmentData, TestData]:
     dataset = store.load(config.dataset_hash)
     bars = symbol_frame(dataset, config.symbol)
     features = load_features(store, config.dataset_hash, config.symbol.upper(), bars)
@@ -53,12 +55,15 @@ def prepare_market_data(store: DatasetStore, config: ExperimentConfig
     return split_development_test(full, config.split)
 
 
-def fit_on_development(spec: AgentSpec, dev: DevelopmentData, *, horizon: int,
-                       max_seconds: float | None = None) -> BaseTradingAgent:
+def fit_on_development(
+    spec: AgentSpec, dev: DevelopmentData, *, horizon: int, max_seconds: float | None = None
+) -> BaseTradingAgent:
     """Fit an agent on all usable development rows (labels purged at the dev end)."""
     agent = create_agent(spec.agent_id, spec.genome, spec.seed)
     positions = usable_positions(dev)
     X, y = training_matrix(dev, positions, horizon=horizon)
-    agent.fit(TrainingSet(X, y, dev.bars), FitContext(seed=spec.seed, horizon=horizon,
-                                                      max_seconds=max_seconds))
+    agent.fit(
+        TrainingSet(X, y, dev.bars),
+        FitContext(seed=spec.seed, horizon=horizon, max_seconds=max_seconds),
+    )
     return agent

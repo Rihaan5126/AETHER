@@ -54,8 +54,9 @@ class MarketFrame:
         return self.index[-1]
 
     def slice_positions(self, start: int, stop: int) -> MarketFrame:
-        return MarketFrame(self.symbol, self.bars.iloc[start:stop], self.features.iloc[start:stop],
-                           self.period)
+        return MarketFrame(
+            self.symbol, self.bars.iloc[start:stop], self.features.iloc[start:stop], self.period
+        )
 
 
 @dataclass(frozen=True)
@@ -90,7 +91,7 @@ class SplitConfig(BaseModel):
             if ts <= index[0] or ts > index[-1]:
                 raise ValueError("test_start must fall inside the dataset")
             return index[index >= ts][0]
-        pos = int(round(len(index) * (1 - self.test_fraction)))
+        pos = round(len(index) * (1 - self.test_fraction))
         return index[min(max(pos, 1), len(index) - 1)]
 
 

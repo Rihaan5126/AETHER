@@ -117,26 +117,34 @@ def _observations(dev: DevelopmentData, fold: Fold) -> tuple[Observations, pd.Da
     return obs, val.bars
 
 
-def _fit_for_fold(agent: BaseTradingAgent, dev: DevelopmentData, fold: Fold,
-                  cfg: EvaluationConfig) -> dict[str, Any]:
-    X, y = training_matrix(dev, fold.train_positions, horizon=cfg.walk_forward.horizon,
-                           label_cutoff=fold.val_start)
+def _fit_for_fold(
+    agent: BaseTradingAgent, dev: DevelopmentData, fold: Fold, cfg: EvaluationConfig
+) -> dict[str, Any]:
+    X, y = training_matrix(
+        dev, fold.train_positions, horizon=cfg.walk_forward.horizon, label_cutoff=fold.val_start
+    )
     history = dev.bars.iloc[: fold.train_positions[-1] + 1]
-    return agent.fit(TrainingSet(X, y, history),
-                     FitContext(seed=agent.seed, horizon=cfg.walk_forward.horizon,
-                                max_seconds=cfg.max_fit_seconds))
+    return agent.fit(
+        TrainingSet(X, y, history),
+        FitContext(
+            seed=agent.seed, horizon=cfg.walk_forward.horizon, max_seconds=cfg.max_fit_seconds
+        ),
+    )
 
 
-def _simulate_fold(agent: BaseTradingAgent, dev: DevelopmentData, fold: Fold,
-                   cfg: EvaluationConfig) -> SimulationResult:
+def _simulate_fold(
+    agent: BaseTradingAgent, dev: DevelopmentData, fold: Fold, cfg: EvaluationConfig
+) -> SimulationResult:
     obs, bars = _observations(dev, fold)
     weights = agent.predict(obs)
-    return simulate(bars, weights, execution=cfg.execution, risk=cfg.risk,
-                    realised_vol=obs.features["vol_20"])
+    return simulate(
+        bars, weights, execution=cfg.execution, risk=cfg.risk, realised_vol=obs.features["vol_20"]
+    )
 
 
-def benchmark_folds(dev: DevelopmentData, folds: Sequence[Fold],
-                    cfg: EvaluationConfig) -> list[SimulationResult]:
+def benchmark_folds(
+    dev: DevelopmentData, folds: Sequence[Fold], cfg: EvaluationConfig
+) -> list[SimulationResult]:
     bench = create_agent("benchmark", BuyAndHoldGenome(), 0)
     return [_simulate_fold(bench, dev, f, cfg) for f in folds]
 
@@ -153,13 +161,19 @@ def stitch(results: Sequence[SimulationResult], initial: float) -> SimulationRes
         eq["fold"] = k
         frames.append(eq)
         for t in res.trades:
-            trades.append(t.__class__(**{**t.__dict__,
-                                         "quantity": t.quantity * factor,
-                                         "notional": t.notional * factor,
-                                         "fee": t.fee * factor,
-                                         "slippage_cost": t.slippage_cost * factor,
-                                         "position_after": t.position_after * factor,
-                                         "cash_after": t.cash_after * factor}))
+            trades.append(
+                t.__class__(
+                    **{
+                        **t.__dict__,
+                        "quantity": t.quantity * factor,
+                        "notional": t.notional * factor,
+                        "fee": t.fee * factor,
+                        "slippage_cost": t.slippage_cost * factor,
+                        "position_after": t.position_after * factor,
+                        "cash_after": t.cash_after * factor,
+                    }
+                )
+            )
         rejected += res.rejected_orders
         events += res.risk_events
         level = float(eq["equity"].iloc[-1])
@@ -183,8 +197,11 @@ def evaluate_agent(
 ) -> AgentEvaluation:
     started = time.perf_counter()
     ev = AgentEvaluation(
-        agent_id=spec.agent_id, family=spec.family, genome=genome_to_dict(spec.genome),
-        seed=spec.seed, is_benchmark=spec.family in BENCHMARK_FAMILIES,
+        agent_id=spec.agent_id,
+        family=spec.family,
+        genome=genome_to_dict(spec.genome),
+        seed=spec.seed,
+        is_benchmark=spec.family in BENCHMARK_FAMILIES,
     )
     bench = list(benchmark) if benchmark is not None else benchmark_folds(dev, folds, cfg)
     try:
@@ -206,11 +223,13 @@ def evaluate_agent(
         ev.metrics = overall.to_dict()
         from trading_engine.evaluation.metrics import PerformanceMetrics  # noqa: PLC0415
 
-        fold_objs = [PerformanceMetrics(**{k: m[k] for k in PerformanceMetrics.__dataclass_fields__})
-                     for m in ev.fold_metrics]
-        ev.warnings = statistical_warnings(overall, fold_objs,
-                                           is_active=spec.family != "buy_and_hold",
-                                           thresholds=cfg.warnings)
+        fold_objs = [
+            PerformanceMetrics(**{k: m[k] for k in PerformanceMetrics.__dataclass_fields__})
+            for m in ev.fold_metrics
+        ]
+        ev.warnings = statistical_warnings(
+            overall, fold_objs, is_active=spec.family != "buy_and_hold", thresholds=cfg.warnings
+        )
         ev.equity = stitched.equity
         ev.trades = stitched.trades_frame()
         ev.rejected_orders = len(stitched.rejected_orders)
@@ -228,17 +247,17 @@ def evaluate_agent(
 
 def _jsonable(d: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
-    for k, v in d.items():
-        if isinstance(v, np.generic):
-            v = v.item()
-        if isinstance(v, float) and not np.isfinite(v):
-            v = None
-        out[k] = v
+    for k, raw in d.items():
+        v = raw.item() if isinstance(raw, np.generic) else raw
+        out[k] = None if isinstance(v, float) and not np.isfinite(v) else v
     return out
 
 
-def _evaluate_payload(args: tuple[dict[str, Any], DevelopmentData, list[Fold], EvaluationConfig,
-                                  list[SimulationResult]]) -> AgentEvaluation:
+def _evaluate_payload(
+    args: tuple[
+        dict[str, Any], DevelopmentData, list[Fold], EvaluationConfig, list[SimulationResult]
+    ],
+) -> AgentEvaluation:
     payload, dev, folds, cfg, bench = args
     spec = AgentSpec(payload["agent_id"], parse_genome(payload["genome"]), payload["seed"])
     return evaluate_agent(spec, dev, folds, cfg, bench)
@@ -269,10 +288,19 @@ def run_tournament(
             if on_progress:
                 on_progress(len(evaluations), total, ev)
     else:
-        payloads = [({"agent_id": s.agent_id, "genome": genome_to_dict(s.genome), "seed": s.seed},
-                     dev, folds, cfg, bench) for s in specs]
-        with ProcessPoolExecutor(max_workers=max_workers,
-                                 mp_context=mp.get_context("spawn")) as pool:
+        payloads = [
+            (
+                {"agent_id": s.agent_id, "genome": genome_to_dict(s.genome), "seed": s.seed},
+                dev,
+                folds,
+                cfg,
+                bench,
+            )
+            for s in specs
+        ]
+        with ProcessPoolExecutor(
+            max_workers=max_workers, mp_context=mp.get_context("spawn")
+        ) as pool:
             for ev in pool.map(_evaluate_payload, payloads):
                 if should_cancel and should_cancel():
                     pool.shutdown(cancel_futures=True)

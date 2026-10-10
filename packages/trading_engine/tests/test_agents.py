@@ -3,7 +3,6 @@ from __future__ import annotations
 import numpy as np
 import pydantic
 import pytest
-
 from trading_engine.agents import (
     FitContext,
     Observations,
@@ -21,8 +20,11 @@ from trading_engine.training.splits import training_matrix
 
 ALL = ["random", "buy_and_hold", "momentum", "random_forest", "xgboost", "mlp"]
 LEARNED = ["random_forest", "xgboost", "mlp"]
-FAST = {"random_forest": {"n_estimators": 60}, "xgboost": {"n_estimators": 60},
-        "mlp": {"max_epochs": 15}}
+FAST = {
+    "random_forest": {"n_estimators": 60},
+    "xgboost": {"n_estimators": 60},
+    "mlp": {"max_epochs": 15},
+}
 
 
 @pytest.fixture(scope="module")

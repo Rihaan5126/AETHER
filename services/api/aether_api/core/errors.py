@@ -11,8 +11,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 class APIError(Exception):
-    def __init__(self, status_code: int, code: str, message: str,
-                 details: Any | None = None) -> None:
+    def __init__(
+        self, status_code: int, code: str, message: str, details: Any | None = None
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.code = code
@@ -43,14 +44,24 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:
-        details = [{"loc": list(e.get("loc", [])), "msg": e.get("msg"), "type": e.get("type")}
-                   for e in exc.errors()]
-        return JSONResponse(_body("validation_error", "request validation failed", details),
-                            status_code=422)
+        details = [
+            {"loc": list(e.get("loc", [])), "msg": e.get("msg"), "type": e.get("type")}
+            for e in exc.errors()
+        ]
+        return JSONResponse(
+            _body("validation_error", "request validation failed", details), status_code=422
+        )
 
     @app.exception_handler(StarletteHTTPException)
     async def _http(_: Request, exc: StarletteHTTPException) -> JSONResponse:
-        code = {404: "not_found", 405: "method_not_allowed", 401: "unauthorized",
-                429: "rate_limited"}.get(exc.status_code, "http_error")
-        return JSONResponse(_body(code, str(exc.detail)), status_code=exc.status_code,
-                            headers=getattr(exc, "headers", None))
+        code = {
+            404: "not_found",
+            405: "method_not_allowed",
+            401: "unauthorized",
+            429: "rate_limited",
+        }.get(exc.status_code, "http_error")
+        return JSONResponse(
+            _body(code, str(exc.detail)),
+            status_code=exc.status_code,
+            headers=getattr(exc, "headers", None),
+        )

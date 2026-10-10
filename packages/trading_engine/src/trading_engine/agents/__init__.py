@@ -14,8 +14,8 @@ from trading_engine.agents.base import (
 from trading_engine.agents.baselines import BuyAndHoldAgent, MomentumAgent, RandomAgent
 from trading_engine.agents.genomes import (
     BENCHMARK_FAMILIES,
-    LEARNED_FAMILIES,
     GENOME_TYPES,
+    LEARNED_FAMILIES,
     AgentFamily,
     Genome,
     default_genome,
@@ -27,8 +27,14 @@ from trading_engine.storage import ArtifactRef, ArtifactStore
 
 AGENT_CLASSES: dict[str, type[BaseTradingAgent]] = {
     cls.family: cls
-    for cls in (RandomAgent, BuyAndHoldAgent, MomentumAgent, RandomForestAgent, XGBoostAgent,
-                MLPAgent)
+    for cls in (
+        RandomAgent,
+        BuyAndHoldAgent,
+        MomentumAgent,
+        RandomForestAgent,
+        XGBoostAgent,
+        MLPAgent,
+    )
 }
 
 
@@ -36,7 +42,7 @@ def create_agent(agent_id: str, genome: BaseModel, seed: int) -> BaseTradingAgen
     family = getattr(genome, "family", None)
     if family not in AGENT_CLASSES:
         raise ValueError(f"unknown agent family {family!r}")
-    return AGENT_CLASSES[family](agent_id, genome, seed)  # type: ignore[arg-type]
+    return AGENT_CLASSES[family](agent_id, genome, seed)
 
 
 def save_agent(agent: BaseTradingAgent, store: ArtifactStore, key: str) -> ArtifactRef:

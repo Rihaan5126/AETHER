@@ -78,8 +78,9 @@ class RiskManager:
         events: list[RiskEvent] = []
 
         def note(code: str, msg: str, approved: float) -> None:
-            events.append(RiskEvent(code, msg, proposed if math.isfinite(proposed) else None,
-                                    approved))
+            events.append(
+                RiskEvent(code, msg, proposed if math.isfinite(proposed) else None, approved)
+            )
 
         if self._breaker_remaining > 0:
             self._breaker_remaining -= 1
@@ -94,8 +95,11 @@ class RiskManager:
                 return RiskDecision(0.0, events)
 
         if not math.isfinite(proposed):
-            note("invalid_signal", "non-finite target weight rejected; position unchanged",
-                 state.current_weight)
+            note(
+                "invalid_signal",
+                "non-finite target weight rejected; position unchanged",
+                state.current_weight,
+            )
             return RiskDecision(state.current_weight, events)
 
         weight = proposed

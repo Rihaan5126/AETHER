@@ -35,8 +35,9 @@ celery_app.conf.update(
 )
 
 
-@celery_app.task(name="aether.run_job", autoretry_for=(OperationalError,), retry_backoff=True,
-                 max_retries=3)
+@celery_app.task(
+    name="aether.run_job", autoretry_for=(OperationalError,), retry_backoff=True, max_retries=3
+)
 def run_job_task(job_id: str) -> None:
     run_job(job_id)
 

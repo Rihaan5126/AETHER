@@ -16,7 +16,7 @@ import json
 import math
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import joblib
 import numpy as np
@@ -59,7 +59,7 @@ class LearnedAgent(BaseTradingAgent):
         X = self._select(training.X)
         y = training.y.to_numpy(dtype="float64")
         if self.genome.train_window is not None and len(X) > self.genome.train_window:
-            X, y = X.iloc[-self.genome.train_window:], y[-self.genome.train_window:]
+            X, y = X.iloc[-self.genome.train_window :], y[-self.genome.train_window :]
         if len(X) < 100:
             raise ValueError(f"not enough training rows ({len(X)})")
         if np.isnan(X.to_numpy()).any() or np.isnan(y).any():
@@ -72,14 +72,16 @@ class LearnedAgent(BaseTradingAgent):
         metrics = self._fit_model(X, y, context)
         p = self._score(X)
         metrics.update(_classification_metrics(y, p, "train"))
-        metrics.update({
-            "n_samples": len(X),
-            "n_features": X.shape[1],
-            "train_start": X.index[0].date().isoformat(),
-            "train_end": X.index[-1].date().isoformat(),
-            "fit_seconds": round(time.perf_counter() - started, 3),
-            "fitted": True,
-        })
+        metrics.update(
+            {
+                "n_samples": len(X),
+                "n_features": X.shape[1],
+                "train_start": X.index[0].date().isoformat(),
+                "train_end": X.index[-1].date().isoformat(),
+                "fit_seconds": round(time.perf_counter() - started, 3),
+                "fitted": True,
+            }
+        )
         self.training_metrics = metrics
         self.fitted = True
         return metrics
@@ -118,20 +120,28 @@ class RandomForestAgent(LearnedAgent):
 
     def _fit_model(self, X: pd.DataFrame, y: np.ndarray, context: FitContext) -> dict[str, Any]:
         g = self.genome
-        self.model = Pipeline([
-            ("model", RandomForestClassifier(
-                n_estimators=g.n_estimators,
-                max_depth=g.max_depth,
-                min_samples_leaf=g.min_samples_leaf,
-                max_features=g.max_features,
-                random_state=self.seed,
-                n_jobs=1,
-            )),
-        ])
+        self.model = Pipeline(
+            [
+                (
+                    "model",
+                    RandomForestClassifier(
+                        n_estimators=g.n_estimators,
+                        max_depth=g.max_depth,
+                        min_samples_leaf=g.min_samples_leaf,
+                        max_features=g.max_features,
+                        random_state=self.seed,
+                        n_jobs=1,
+                    ),
+                ),
+            ]
+        )
         self.model.fit(X.to_numpy(), y.astype(int))
         importances = self.model.named_steps["model"].feature_importances_
-        return {"feature_importance": dict(zip(X.columns, np.round(importances, 5).tolist(),
-                                               strict=True))}
+        return {
+            "feature_importance": dict(
+                zip(X.columns, np.round(importances, 5).tolist(), strict=True)
+            )
+        }
 
     def _score(self, X: pd.DataFrame) -> np.ndarray:
         assert self.model is not None
@@ -175,7 +185,7 @@ class XGBoostAgent(LearnedAgent):
         self.model = self._make()
         self.model.fit(X.to_numpy(), y.astype(int))
         gain = self.model.get_booster().get_score(importance_type="gain")
-        named = {X.columns[int(k[1:])]: round(v, 5) for k, v in gain.items()}
+        named = {X.columns[int(k[1:])]: round(float(cast(float, v)), 5) for k, v in gain.items()}
         return {"feature_importance": named}
 
     def _score(self, X: pd.DataFrame) -> np.ndarray:
@@ -244,11 +254,15 @@ class MLPAgent(LearnedAgent):
         self.scale_[self.scale_ < 1e-12] = 1.0
         Xs = self._standardise(Xa).astype("float32")
         Xt, yt = torch.from_numpy(Xs[:fit_end]), torch.from_numpy(y[:fit_end].astype("float32"))
-        Xv, yv = torch.from_numpy(Xs[n - n_val:]), torch.from_numpy(y[n - n_val:].astype("float32"))
+        Xv, yv = (
+            torch.from_numpy(Xs[n - n_val :]),
+            torch.from_numpy(y[n - n_val :].astype("float32")),
+        )
 
         self.net = self._build(Xs.shape[1])
-        opt = torch.optim.AdamW(self.net.parameters(), lr=g.learning_rate,
-                                weight_decay=g.weight_decay)
+        opt = torch.optim.AdamW(
+            self.net.parameters(), lr=g.learning_rate, weight_decay=g.weight_decay
+        )
         loss_fn = nn.BCEWithLogitsLoss()
         gen = torch.Generator().manual_seed(self.seed)
         best_loss, best_state, best_epoch, stale = math.inf, None, 0, 0
@@ -258,7 +272,7 @@ class MLPAgent(LearnedAgent):
             self.net.train()
             perm = torch.randperm(len(Xt), generator=gen)
             for start in range(0, len(Xt), g.batch_size):
-                batch = perm[start:start + g.batch_size]
+                batch = perm[start : start + g.batch_size]
                 opt.zero_grad()
                 loss = loss_fn(self.net(Xt[batch]).squeeze(-1), yt[batch])
                 loss.backward()
@@ -279,8 +293,12 @@ class MLPAgent(LearnedAgent):
         if best_state is not None:
             self.net.load_state_dict(best_state)
         self.net.eval()
-        return {"best_epoch": best_epoch, "epochs_run": len(history),
-                "early_stop_val_loss": best_loss, "val_loss_history": history}
+        return {
+            "best_epoch": best_epoch,
+            "epochs_run": len(history),
+            "early_stop_val_loss": best_loss,
+            "val_loss_history": history,
+        }
 
     def _score(self, X: pd.DataFrame) -> np.ndarray:
         import torch  # noqa: PLC0415
@@ -295,9 +313,15 @@ class MLPAgent(LearnedAgent):
 
         assert self.mean_ is not None and self.scale_ is not None
         torch.save(self.net.state_dict(), directory / "model.pt")
-        (directory / "scaler.json").write_text(json.dumps(
-            {"mean": self.mean_.tolist(), "scale": self.scale_.tolist(),
-             "features": list(self.genome.features)}))
+        (directory / "scaler.json").write_text(
+            json.dumps(
+                {
+                    "mean": self.mean_.tolist(),
+                    "scale": self.scale_.tolist(),
+                    "features": list(self.genome.features),
+                }
+            )
+        )
 
     def _load_model(self, directory: Path) -> None:
         import torch  # noqa: PLC0415

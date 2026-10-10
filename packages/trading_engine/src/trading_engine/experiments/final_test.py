@@ -52,19 +52,32 @@ def run_final_test(
     obs = Observations(test.symbol, test.features, history)
 
     def run(agent: BaseTradingAgent) -> Any:
-        return simulate(test.bars, agent.predict(obs), execution=cfg.execution, risk=cfg.risk,
-                        realised_vol=test.features["vol_20"])
+        return simulate(
+            test.bars,
+            agent.predict(obs),
+            execution=cfg.execution,
+            risk=cfg.risk,
+            realised_vol=test.features["vol_20"],
+        )
 
     bench = run(create_agent(BENCHMARK_ID, BuyAndHoldGenome(), 0))
     bench_eq = bench.equity["equity"]
-    result = FinalTestResult(test.start.date().isoformat(), test.end.date().isoformat(),
-                             compute_metrics(bench, bench_eq).to_dict())
+    result = FinalTestResult(
+        test.start.date().isoformat(),
+        test.end.date().isoformat(),
+        compute_metrics(bench, bench_eq).to_dict(),
+    )
     result.equity[BENCHMARK_ID] = bench.equity
     for agent in agents:
         res = run(agent)
         m = compute_metrics(res, bench_eq)
-        result.agents.append({"agent_id": agent.agent_id, "family": agent.family,
-                              "metrics": m.to_dict(),
-                              "rejected_orders": len(res.rejected_orders)})
+        result.agents.append(
+            {
+                "agent_id": agent.agent_id,
+                "family": agent.family,
+                "metrics": m.to_dict(),
+                "rejected_orders": len(res.rejected_orders),
+            }
+        )
         result.equity[agent.agent_id] = res.equity
     return result

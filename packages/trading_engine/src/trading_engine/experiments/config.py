@@ -13,8 +13,14 @@ from trading_engine.training import SplitConfig
 
 # Relative cost of one fold fit per family (measured on the synthetic dataset;
 # only used for a coarse *relative* workload indication, never as a time estimate).
-_RELATIVE_FIT_COST = {"momentum": 0.05, "random_forest": 1.0, "xgboost": 0.4, "mlp": 0.6,
-                      "random": 0.02, "buy_and_hold": 0.02}
+_RELATIVE_FIT_COST = {
+    "momentum": 0.05,
+    "random_forest": 1.0,
+    "xgboost": 0.4,
+    "mlp": 0.6,
+    "random": 0.02,
+    "buy_and_hold": 0.02,
+}
 
 
 class ExperimentConfig(BaseModel):

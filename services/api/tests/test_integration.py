@@ -32,8 +32,10 @@ def test_experiment_record(completed_experiment):
     m = exp["manifest"]
     assert m["seed"] == 3 and m["dataset_hash"] == exp["config"]["dataset_hash"]
     assert m["dependencies"]["xgboost"] and m["code_version"]
-    assert exp["test_period"]["locked"] and exp["development_period"]["end"] < exp[
-        "test_period"]["start"]
+    assert (
+        exp["test_period"]["locked"]
+        and exp["development_period"]["end"] < exp["test_period"]["start"]
+    )
     assert exp["resource_usage"]["max_rss_mb"] > 0
 
 
@@ -50,8 +52,9 @@ def test_leaderboard_and_results(client, completed_experiment):
     curves = client.get(f"{API}/tournaments/{gen['tournament_id']}/equity-curves").json()
     assert len(curves["series"]) == 6 and curves["benchmark"]["points"]
     trades = client.get(f"{API}/tournaments/{gen['tournament_id']}/trades?limit=10").json()
-    assert trades["total"] > 0 and trades["items"][0]["timestamp"] > trades["items"][0][
-        "signal_time"]
+    assert (
+        trades["total"] > 0 and trades["items"][0]["timestamp"] > trades["items"][0]["signal_time"]
+    )
 
 
 def test_lineage_and_agents(client, completed_experiment):
@@ -82,8 +85,9 @@ def test_final_test_is_locked(client, completed_experiment):
     assert run["test_period"]["start"] == exp["test_period"]["start"]
     again = client.post(f"{API}/experiments/{exp_id}/final-test", json={})
     assert again.status_code == 409 and again.json()["error"]["code"] == "final_test_locked"
-    ack = client.post(f"{API}/experiments/{exp_id}/final-test",
-                      json={"acknowledge_contamination": True})
+    ack = client.post(
+        f"{API}/experiments/{exp_id}/final-test", json={"acknowledge_contamination": True}
+    )
     assert ack.status_code == 202
     wait_for_job(client, ack.json()["job_id"])
     assert client.get(f"{API}/experiments/{exp_id}").json()["test_contaminated"] is True
@@ -100,8 +104,9 @@ def test_analytics(client, completed_experiment):
 
 def test_optimisation_study(client, completed_experiment):
     exp_id = completed_experiment["id"]
-    r = client.post(f"{API}/experiments/{exp_id}/optimize",
-                    json={"family": "momentum", "n_trials": 4})
+    r = client.post(
+        f"{API}/experiments/{exp_id}/optimize", json={"family": "momentum", "n_trials": 4}
+    )
     assert r.status_code == 202
     job = wait_for_job(client, r.json()["job_id"])
     assert job["status"] == "completed", job
@@ -110,25 +115,47 @@ def test_optimisation_study(client, completed_experiment):
 
 
 def test_standalone_tournament(client, dataset_id):
-    r = client.post(f"{API}/tournaments", json={
-        "name": "baselines", "dataset_id": dataset_id, "symbol": "ALT", "n_folds": 2,
-        "agents": [{"family": "buy_and_hold"}, {"family": "random", "seed": 1},
-                   {"family": "momentum", "genome": {"fast_window": 10, "slow_window": 50}}]})
+    r = client.post(
+        f"{API}/tournaments",
+        json={
+            "name": "baselines",
+            "dataset_id": dataset_id,
+            "symbol": "ALT",
+            "n_folds": 2,
+            "agents": [
+                {"family": "buy_and_hold"},
+                {"family": "random", "seed": 1},
+                {"family": "momentum", "genome": {"fast_window": 10, "slow_window": 50}},
+            ],
+        },
+    )
     assert r.status_code == 202, r.text
     job = wait_for_job(client, r.json()["job_id"])
     assert job["status"] == "completed", job
     t = client.get(f"{API}/tournaments?experiment_id={r.json()['experiment_id']}").json()
     board = client.get(f"{API}/tournaments/{t['items'][0]['id']}/leaderboard").json()
     assert len(board["rows"]) == 3
-    bad = client.post(f"{API}/tournaments", json={
-        "name": "bad", "dataset_id": dataset_id, "symbol": "ALT",
-        "agents": [{"family": "momentum", "genome": {"fast_window": 90, "slow_window": 50}}]})
+    bad = client.post(
+        f"{API}/tournaments",
+        json={
+            "name": "bad",
+            "dataset_id": dataset_id,
+            "symbol": "ALT",
+            "agents": [{"family": "momentum", "genome": {"fast_window": 90, "slow_window": 50}}],
+        },
+    )
     assert bad.status_code == 400
 
 
 def test_cancellation(client, dataset_id):
-    body = {**SMALL_EXPERIMENT, "name": "to cancel", "dataset_id": dataset_id,
-            "families": ["mlp", "random_forest"], "population_size": 8, "generations": 3}
+    body = {
+        **SMALL_EXPERIMENT,
+        "name": "to cancel",
+        "dataset_id": dataset_id,
+        "families": ["mlp", "random_forest"],
+        "population_size": 8,
+        "generations": 3,
+    }
     exp = client.post(f"{API}/experiments", json=body).json()
     job_id = client.post(f"{API}/experiments/{exp['id']}/start").json()["job_id"]
     deadline = time.monotonic() + 60

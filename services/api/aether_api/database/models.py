@@ -99,8 +99,9 @@ class Agent(Base):
     algorithm: Mapped[str] = mapped_column(String(32), index=True)
     genome: Mapped[dict[str, Any]] = mapped_column(JSONType)
     generation: Mapped[int] = mapped_column(Integer)
-    parent_id: Mapped[str | None] = mapped_column(ForeignKey("agents.id"), nullable=True,
-                                                  index=True)
+    parent_id: Mapped[str | None] = mapped_column(
+        ForeignKey("agents.id"), nullable=True, index=True
+    )
     origin: Mapped[str] = mapped_column(String(16))
     seed: Mapped[int] = mapped_column(Integer)
     is_benchmark: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -116,8 +117,7 @@ class TrainingRun(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     experiment_id: Mapped[str] = mapped_column(ForeignKey("experiments.id"), index=True)
     agent_id: Mapped[str] = mapped_column(ForeignKey("agents.id"), index=True)
-    tournament_id: Mapped[str | None] = mapped_column(ForeignKey("tournaments.id"),
-                                                      nullable=True)
+    tournament_id: Mapped[str | None] = mapped_column(ForeignKey("tournaments.id"), nullable=True)
     status: Mapped[str] = mapped_column(String(16))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -142,7 +142,8 @@ class Tournament(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     results: Mapped[list[TournamentResult]] = relationship(
-        back_populates="tournament", order_by="TournamentResult.rank")
+        back_populates="tournament", order_by="TournamentResult.rank"
+    )
 
 
 class TournamentResult(Base):
@@ -174,8 +175,9 @@ class Trade(Base):
     __tablename__ = "trades"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    tournament_result_id: Mapped[str] = mapped_column(ForeignKey("tournament_results.id"),
-                                                      index=True)
+    tournament_result_id: Mapped[str] = mapped_column(
+        ForeignKey("tournament_results.id"), index=True
+    )
     symbol: Mapped[str] = mapped_column(String(16))
     timestamp: Mapped[datetime] = mapped_column(DateTime)  # execution time (exchange local)
     signal_time: Mapped[datetime] = mapped_column(DateTime)
@@ -193,10 +195,12 @@ class EquityCurve(Base):
     __tablename__ = "equity_curves"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
-    tournament_id: Mapped[str | None] = mapped_column(ForeignKey("tournaments.id"), index=True,
-                                                      nullable=True)
-    final_test_run_id: Mapped[str | None] = mapped_column(ForeignKey("final_test_runs.id"),
-                                                          nullable=True)
+    tournament_id: Mapped[str | None] = mapped_column(
+        ForeignKey("tournaments.id"), index=True, nullable=True
+    )
+    final_test_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("final_test_runs.id"), nullable=True
+    )
     path: Mapped[str] = mapped_column(String(255))
     sha256: Mapped[str] = mapped_column(String(64))
     rows: Mapped[int] = mapped_column(Integer)
@@ -209,8 +213,9 @@ class ModelLineage(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     experiment_id: Mapped[str] = mapped_column(ForeignKey("experiments.id"), index=True)
     child_id: Mapped[str] = mapped_column(ForeignKey("agents.id"), index=True)
-    parent_id: Mapped[str | None] = mapped_column(ForeignKey("agents.id"), index=True,
-                                                  nullable=True)
+    parent_id: Mapped[str | None] = mapped_column(
+        ForeignKey("agents.id"), index=True, nullable=True
+    )
     generation: Mapped[int] = mapped_column(Integer)
     operation: Mapped[str] = mapped_column(String(16))
     mutation_description: Mapped[list[Any]] = mapped_column(JSONType, default=list)
@@ -231,8 +236,9 @@ class Job(Base):
     message: Mapped[str] = mapped_column(Text, default="")
     payload: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
     result: Mapped[dict[str, Any] | None] = mapped_column(JSONType, nullable=True)
-    experiment_id: Mapped[str | None] = mapped_column(ForeignKey("experiments.id"),
-                                                      nullable=True, index=True)
+    experiment_id: Mapped[str | None] = mapped_column(
+        ForeignKey("experiments.id"), nullable=True, index=True
+    )
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

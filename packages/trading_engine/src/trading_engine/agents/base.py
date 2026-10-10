@@ -51,8 +51,10 @@ class Observations:
     history: pd.DataFrame
 
     def __post_init__(self) -> None:
-        if len(self.features) and len(self.history) and (
-            self.history.index[-1] > self.features.index[-1]
+        if (
+            len(self.features)
+            and len(self.history)
+            and (self.history.index[-1] > self.features.index[-1])
         ):
             raise ValueError("observation history extends beyond the last decision date")
 
@@ -116,8 +118,12 @@ class BaseTradingAgent(ABC):
         weights = self.predict(observations)
         fc = self.forecast(observations).reindex(observations.features.index)
         return [
-            AgentDecision(observations.symbol, float(w), ts.to_pydatetime(),
-                          float(c) if self.is_learned and np.isfinite(c) else None)
+            AgentDecision(
+                observations.symbol,
+                float(w),
+                ts.to_pydatetime(),
+                float(c) if self.is_learned and np.isfinite(c) else None,
+            )
             for ts, w, c in zip(observations.features.index, weights, fc.to_numpy(), strict=True)
         ]
 
@@ -135,8 +141,7 @@ class BaseTradingAgent(ABC):
 
     def save(self, directory: Path) -> None:
         directory.mkdir(parents=True, exist_ok=True)
-        (directory / "meta.json").write_text(json.dumps(self.get_metadata(), indent=2,
-                                                         default=str))
+        (directory / "meta.json").write_text(json.dumps(self.get_metadata(), indent=2, default=str))
         self._save_model(directory)
 
     def _save_model(self, directory: Path) -> None:

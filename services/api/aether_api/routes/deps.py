@@ -12,8 +12,9 @@ T = TypeVar("T")
 
 
 class Pagination:
-    def __init__(self, limit: int = Query(50, ge=1, le=200),
-                 offset: int = Query(0, ge=0, le=1_000_000)) -> None:
+    def __init__(
+        self, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0, le=1_000_000)
+    ) -> None:
         self.limit = limit
         self.offset = offset
 

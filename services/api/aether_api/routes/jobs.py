@@ -15,17 +15,24 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.get("", response_model=Page[JobOut])
-def list_jobs(status: str | None = Query(None, pattern="^(queued|running|completed|failed|cancelled)$"),
-              experiment_id: str | None = None, page: Pagination = Depends(),
-              db: Session = Depends(get_db)) -> Page[JobOut]:
+def list_jobs(
+    status: str | None = Query(None, pattern="^(queued|running|completed|failed|cancelled)$"),
+    experiment_id: str | None = None,
+    page: Pagination = Depends(),
+    db: Session = Depends(get_db),
+) -> Page[JobOut]:
     q = select(Job).order_by(Job.created_at.desc())
     if status:
         q = q.where(Job.status == status)
     if experiment_id:
         q = q.where(Job.experiment_id == experiment_id)
     items, total = paginate(db, q, page)
-    return Page[JobOut](items=[JobOut.model_validate(j) for j in items], total=total,
-                        limit=page.limit, offset=page.offset)
+    return Page[JobOut](
+        items=[JobOut.model_validate(j) for j in items],
+        total=total,
+        limit=page.limit,
+        offset=page.offset,
+    )
 
 
 @router.get("/{job_id}", response_model=JobOut)

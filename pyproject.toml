@@ -33,7 +33,15 @@ extend-exclude = ["apps", "services/api/migrations/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N", "PL"]
-ignore = ["PLR0913", "PLR2004", "PLR0912", "PLR0915", "PLR0911", "RUF012", "N803", "N806"]
+ignore = ["B027", "UP046", "PLR0913", "PLR0917", "PLR2004", "PLR0912", "PLR0915", "PLR0911", "RUF012", "N803", "N806"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency injection idiom.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.File", "fastapi.Form",
+                          "fastapi.Header"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["PLC0415"]
 
 [tool.pytest.ini_options]
 testpaths = ["packages/trading_engine/tests", "services/api/tests"]

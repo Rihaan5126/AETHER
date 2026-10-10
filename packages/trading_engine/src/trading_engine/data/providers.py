@@ -242,7 +242,7 @@ class YahooFinanceProvider(MarketDataProvider):
 
     def fetch_ohlcv(self, symbols: Sequence[str], start: date, end: date) -> pd.DataFrame:
         try:
-            import yfinance as yf  # type: ignore[import-not-found]  # noqa: PLC0415
+            import yfinance as yf  # noqa: PLC0415
         except ImportError as exc:  # pragma: no cover - optional dependency
             raise RuntimeError("yfinance is not installed; run `uv sync --extra yahoo`") from exc
         frames = []

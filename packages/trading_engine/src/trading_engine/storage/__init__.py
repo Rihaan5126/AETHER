@@ -98,8 +98,9 @@ class LocalArtifactStore(ArtifactStore):
             if p.is_file() and p.name != "artifact.json"
         }
         digest = hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
-        (path / "artifact.json").write_text(json.dumps({"sha256": digest, "files": files},
-                                                       indent=2))
+        (path / "artifact.json").write_text(
+            json.dumps({"sha256": digest, "files": files}, indent=2)
+        )
         return ArtifactRef(key=key, sha256=digest, files=files)
 
     def open_verified(self, ref: ArtifactRef) -> Path:

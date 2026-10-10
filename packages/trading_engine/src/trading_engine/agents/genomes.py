@@ -21,9 +21,21 @@ BENCHMARK_FAMILIES: frozenset[str] = frozenset({"random", "buy_and_hold"})
 LEARNED_FAMILIES: frozenset[str] = frozenset({"random_forest", "xgboost", "mlp"})
 
 DEFAULT_FEATURES: tuple[str, ...] = (
-    "ret_1", "ret_5", "ret_20", "sma_10_ratio", "sma_50_ratio", "ema_12_ratio", "vol_20",
-    "atr_14_pct", "rsi_14", "macd_hist", "mom_60", "drawdown_60", "rel_volume_20",
-    "bench_vol_60", "trend_strength",
+    "ret_1",
+    "ret_5",
+    "ret_20",
+    "sma_10_ratio",
+    "sma_50_ratio",
+    "ema_12_ratio",
+    "vol_20",
+    "atr_14_pct",
+    "rsi_14",
+    "macd_hist",
+    "mom_60",
+    "drawdown_60",
+    "rel_volume_20",
+    "bench_vol_60",
+    "trend_strength",
 )
 
 
@@ -75,7 +87,9 @@ class _LearnedGenome(_GenomeBase):
     features: tuple[str, ...] = DEFAULT_FEATURES
     policy: PositionPolicy = PositionPolicy()
     train_window: int | None = Field(
-        None, ge=250, le=5000,
+        None,
+        ge=250,
+        le=5000,
         description="use only the most recent N training rows (None = all)",
     )
 
@@ -134,7 +148,11 @@ class MLPGenome(_LearnedGenome):
 
 
 Genome = Annotated[
-    RandomGenome | BuyAndHoldGenome | MomentumGenome | RandomForestGenome | XGBoostGenome
+    RandomGenome
+    | BuyAndHoldGenome
+    | MomentumGenome
+    | RandomForestGenome
+    | XGBoostGenome
     | MLPGenome,
     Field(discriminator="family"),
 ]

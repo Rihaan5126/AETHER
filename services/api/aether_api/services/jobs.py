@@ -61,9 +61,15 @@ class JobContext:
             return
         self._last_write = now
         with session_scope() as db:
-            db.execute(update(Job).where(Job.id == self.job_id).values(
-                progress=max(0.0, min(1.0, fraction)), message=message[:500],
-                heartbeat_at=utcnow()))
+            db.execute(
+                update(Job)
+                .where(Job.id == self.job_id)
+                .values(
+                    progress=max(0.0, min(1.0, fraction)),
+                    message=message[:500],
+                    heartbeat_at=utcnow(),
+                )
+            )
 
     def should_cancel(self) -> bool:
         if time.monotonic() - self.started > self.max_seconds:
@@ -83,8 +89,9 @@ _HANDLERS: dict[str, JobHandler] = {}
 _FAILURE_HOOKS: dict[str, FailureHook] = {}
 
 
-def register(job_type: str, on_failure: FailureHook | None = None
-             ) -> Callable[[JobHandler], JobHandler]:
+def register(
+    job_type: str, on_failure: FailureHook | None = None
+) -> Callable[[JobHandler], JobHandler]:
     """Register a handler; ``on_failure(db, payload, status, error)`` marks related records."""
 
     def deco(fn: JobHandler) -> JobHandler:
@@ -96,12 +103,19 @@ def register(job_type: str, on_failure: FailureHook | None = None
     return deco
 
 
-def create_job(db: Session, job_type: str, payload: dict[str, Any],
-               experiment_id: str | None = None) -> Job:
+def create_job(
+    db: Session, job_type: str, payload: dict[str, Any], experiment_id: str | None = None
+) -> Job:
     if job_type not in _HANDLERS:
         raise ValueError(f"unknown job type {job_type}")
-    job = Job(id=new_id("job"), job_type=job_type, status="queued", payload=payload,
-              experiment_id=experiment_id, message="queued")
+    job = Job(
+        id=new_id("job"),
+        job_type=job_type,
+        status="queued",
+        payload=payload,
+        experiment_id=experiment_id,
+        message="queued",
+    )
     db.add(job)
     db.flush()
     return job
@@ -145,8 +159,15 @@ def run_job(job_id: str) -> None:
     log.info("job.end", job_id=job_id, status=status)
 
 
-def _finish(db: Session, job: Job, status: str, *, result: dict[str, Any] | None = None,
-            error: str | None = None, message: str = "") -> None:
+def _finish(
+    db: Session,
+    job: Job,
+    status: str,
+    *,
+    result: dict[str, Any] | None = None,
+    error: str | None = None,
+    message: str = "",
+) -> None:
     job.status = status
     job.result = result
     job.error_message = error
@@ -215,8 +236,11 @@ def get_backend() -> InlineBackend | CeleryBackend:
     global _backend  # noqa: PLW0603
     if _backend is None:
         settings = get_settings()
-        _backend = (CeleryBackend() if settings.job_backend == "celery"
-                    else InlineBackend(settings.max_concurrent_jobs))
+        _backend = (
+            CeleryBackend()
+            if settings.job_backend == "celery"
+            else InlineBackend(settings.max_concurrent_jobs)
+        )
     return _backend
 
 

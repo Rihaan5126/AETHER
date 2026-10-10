@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -18,8 +18,7 @@ class ExperimentCreateRequest(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=16)
     start_date: date | None = None
     end_date: date | None = None
-    families: list[Family] = Field(
-        default_factory=lambda: ["momentum", "random_forest", "xgboost", "mlp"], min_length=1)
+    families: list[Family] = Field(default_factory=lambda: list(get_args(Family)), min_length=1)
     population_size: int = Field(8, ge=2, le=64)
     generations: int = Field(3, ge=1, le=20)
     elite_count: int = Field(2, ge=0, le=16)
