@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+/*
+ * AETHER design tokens: a restrained research-terminal palette.
+ * Neutral graphite surfaces, one cool accent, semantic positive/negative/warn,
+ * and a fixed categorical palette per algorithm family (used in every chart).
+ */
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --color-bg: #0a0c0f;
+  --color-panel: #101317;
+  --color-panel-2: #151920;
+  --color-raised: #1a1f27;
+  --color-line: #222831;
+  --color-line-strong: #2e3540;
+  --color-fg: #e4e8ee;
+  --color-fg-muted: #9aa4b2;
+  --color-fg-subtle: #6b7685;
+  --color-accent: #8fb3ff;
+  --color-accent-dim: #2a3b5c;
+  --color-pos: #5cc497;
+  --color-neg: #ec7b82;
+  --color-warn: #e0b064;
+
+  --color-algo-random: #8a94a3;
+  --color-algo-buy_and_hold: #d6dbe2;
+  --color-algo-momentum: #e0b064;
+  --color-algo-random_forest: #5cc497;
+  --color-algo-xgboost: #8fb3ff;
+  --color-algo-mlp: #c49bf0;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-bg text-fg antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  ::selection {
+    background: var(--color-accent-dim);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
