@@ -71,6 +71,32 @@ scripts/install-cpu.sh .venv --dev
 uv pip install --no-deps -e packages/trading_engine -e services/api
 ```
 
+## Real market data (Yahoo Finance, optional)
+
+The demo uses synthetic data so it runs offline. To research real instruments,
+install the optional `yfinance` extra and import daily bars. Yahoo data is
+unofficial, is split and dividend adjusted, and is subject to Yahoo's terms. It
+is fine for prototyping and is not institution-grade.
+
+```bash
+uv sync --all-packages --all-extras                     # adds yfinance
+uv run aether import-yahoo --symbols SPY --start 2005-01-01
+uv run aether datasets                                  # note the dataset id
+uv run aether experiment --dataset <id> --symbol SPY --generations 3 --population 8
+```
+
+Every import is validated and stored as an immutable, content-hashed version.
+Re-importing later (new bars, revised history) creates a new version, and old
+experiments keep pointing at the exact bytes they used. The most recent 20% of
+the series (`--test-fraction`) is locked away as the final test. Evolution and
+ranking only ever see the earlier development period.
+
+To import from the dashboard's **Datasets** page instead, set
+`AETHER_ENABLE_YAHOO=true` in `.env` and restart the API. The API keeps it off
+by default, so a public deployment cannot be used to make outbound calls.
+
+On Windows without `make`, run the same commands with `python -m uv run ...`.
+
 ## Full stack with Docker Compose
 
 ```bash

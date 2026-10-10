@@ -18,6 +18,8 @@ os.environ.update(
         "AETHER_JOB_BACKEND": "inline",
         "AETHER_MAX_CONCURRENT_JOBS": "1",
         "AETHER_WRITE_RATE_LIMIT_PER_MINUTE": "1000",
+        # Never hit the network from tests, whatever a developer's local .env says.
+        "AETHER_ENABLE_YAHOO": "false",
     }
 )
 

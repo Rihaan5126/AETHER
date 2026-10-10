@@ -83,6 +83,26 @@ def import_synthetic(request: DatasetImportRequest) -> DatasetManifest:
     )
 
 
+def import_yahoo(request: DatasetImportRequest) -> DatasetManifest:
+    """Download daily bars from Yahoo Finance (network required, prototyping quality only).
+
+    The requested range is recorded so the manifest documents what was asked for, not
+    only what Yahoo returned; the content hash pins the exact bars actually stored.
+    """
+    raw = YahooFinanceProvider().fetch_ohlcv(request.symbols, request.start_date, request.end_date)
+    return import_frame(
+        raw,
+        name=request.name,
+        source="yahoo",
+        params={
+            "symbols": request.symbols,
+            "start_date": request.start_date.isoformat(),
+            "end_date": request.end_date.isoformat(),
+            "adjustment": "yfinance auto_adjust=True (split and dividend adjusted OHLC)",
+        },
+    )
+
+
 @register("import_dataset")
 def import_dataset_job(ctx: JobContext, payload: dict[str, Any]) -> dict[str, Any]:
     request = DatasetImportRequest.model_validate(payload)
@@ -92,12 +112,7 @@ def import_dataset_job(ctx: JobContext, payload: dict[str, Any]) -> dict[str, An
     else:
         if not get_settings().enable_yahoo:
             raise RuntimeError("the Yahoo provider is disabled (set AETHER_ENABLE_YAHOO=true)")
-        raw = YahooFinanceProvider().fetch_ohlcv(
-            request.symbols, request.start_date, request.end_date
-        )
-        manifest = import_frame(
-            raw, name=request.name, source="yahoo", params={"symbols": request.symbols}
-        )
+        manifest = import_yahoo(request)
     ctx.progress(0.8, "registering dataset version", force=True)
     with session_scope() as db:
         row = register_manifest(db, manifest)
