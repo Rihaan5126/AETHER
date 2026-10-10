@@ -1,5 +1,10 @@
 # AETHER: Autonomous Evolutionary Trading Arena
 
+**Live dashboard: [aetherbyrihaan.vercel.app](https://aetherbyrihaan.vercel.app/)** is a
+read-only showcase of real experiments on SPY and VOO (Vanguard S&P 500 ETF)
+daily data, plus the synthetic demo. Training runs locally; the site serves the
+exported results ([how it works](#deploying-a-read-only-showcase-vercel)).
+
 AETHER is a research platform for asking a careful question: *can a population of
 trading agents, trained and evolved on historical data, find anything that
 survives honest out-of-sample evaluation?* It trains rule-based and machine
