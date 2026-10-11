@@ -1,0 +1,69 @@
+{
+  "machine": {
+    "platform": "Windows-11-10.0.26300-SP0",
+    "processor": "AMD64 Family 23 Model 104 Stepping 1, AuthenticAMD",
+    "logical_cpus": 12,
+    "physical_cpus": 6,
+    "cpu_max_mhz": 2100,
+    "memory_gb": 15.3,
+    "python": "3.13.0",
+    "dependencies": {
+      "python": "3.13.0",
+      "trading-engine": "0.1.0",
+      "numpy": "2.5.3",
+      "pandas": "2.3.3",
+      "pyarrow": "26.0.0",
+      "scikit-learn": "1.9.1",
+      "xgboost": "3.4.1",
+      "torch": "2.14.1",
+      "pydantic": "2.14.0",
+      "optuna": "4.9.0"
+    },
+    "code_version": "b0f0f22e362a941fb286bac75032ad59189ea0b9-dirty",
+    "cpu_load_at_start_percent": 20.4
+  },
+  "measured_at": "2026-10-11T15:14:30",
+  "sim": {
+    "engine_path": "<repo>\\packages\\trading_engine\\src\\trading_engine",
+    "bars": 5477,
+    "random (trade-heavy)": {
+      "trades": 284,
+      "simulate": {
+        "median_s": 0.0604,
+        "min_s": 0.0549,
+        "max_s": 0.067,
+        "repeat": 7
+      },
+      "bars_per_second": 90679,
+      "compute_metrics": {
+        "median_s": 0.0185,
+        "min_s": 0.0165,
+        "max_s": 0.0214,
+        "repeat": 7
+      }
+    },
+    "momentum ma_cross (few trades)": {
+      "trades": 55,
+      "simulate": {
+        "median_s": 0.0522,
+        "min_s": 0.0506,
+        "max_s": 0.0569,
+        "repeat": 7
+      },
+      "bars_per_second": 104923,
+      "compute_metrics": {
+        "median_s": 0.0181,
+        "min_s": 0.0157,
+        "max_s": 0.0212,
+        "repeat": 7
+      }
+    },
+    "random_null_100_on_test_window": {
+      "median_s": 2.1398,
+      "min_s": 2.115,
+      "max_s": 2.1398,
+      "repeat": 3,
+      "bars": 1095
+    }
+  }
+}

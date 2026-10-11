@@ -1,0 +1,69 @@
+{
+  "machine": {
+    "platform": "Windows-11-10.0.26300-SP0",
+    "processor": "AMD64 Family 23 Model 104 Stepping 1, AuthenticAMD",
+    "logical_cpus": 12,
+    "physical_cpus": 6,
+    "cpu_max_mhz": 2100,
+    "memory_gb": 15.3,
+    "python": "3.13.0",
+    "dependencies": {
+      "python": "3.13.0",
+      "trading-engine": "0.1.0",
+      "numpy": "2.5.3",
+      "pandas": "2.3.3",
+      "pyarrow": "26.0.0",
+      "scikit-learn": "1.9.1",
+      "xgboost": "3.4.1",
+      "torch": "2.14.1",
+      "pydantic": "2.14.0",
+      "optuna": "4.9.0"
+    },
+    "code_version": "a3660eb783e6fc8812eb5b2c209e5661a34061d3",
+    "cpu_load_at_start_percent": 9.1
+  },
+  "measured_at": "2026-10-11T15:14:06",
+  "sim": {
+    "engine_path": "<git worktree of commit a3660eb>/packages/trading_engine/src/trading_engine",
+    "bars": 5477,
+    "random (trade-heavy)": {
+      "trades": 284,
+      "simulate": {
+        "median_s": 0.0822,
+        "min_s": 0.0786,
+        "max_s": 0.089,
+        "repeat": 7
+      },
+      "bars_per_second": 66630,
+      "compute_metrics": {
+        "median_s": 0.0593,
+        "min_s": 0.0584,
+        "max_s": 0.0596,
+        "repeat": 7
+      }
+    },
+    "momentum ma_cross (few trades)": {
+      "trades": 55,
+      "simulate": {
+        "median_s": 0.0593,
+        "min_s": 0.0586,
+        "max_s": 0.0691,
+        "repeat": 7
+      },
+      "bars_per_second": 92361,
+      "compute_metrics": {
+        "median_s": 0.0674,
+        "min_s": 0.0609,
+        "max_s": 0.0792,
+        "repeat": 7
+      }
+    },
+    "random_null_100_on_test_window": {
+      "median_s": 3.5108,
+      "min_s": 3.3735,
+      "max_s": 3.5257,
+      "repeat": 3,
+      "bars": 1095
+    }
+  }
+}

@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python (lint, types, tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.32"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Install dependencies (locked, CPU-only PyTorch)
+        run: |
+          scripts/install-cpu.sh .venv --dev
+          uv pip install --python .venv/bin/python --no-deps -e packages/trading_engine -e services/api
+      - name: Ruff
+        run: |
+          uv run --no-sync ruff check .
+          uv run --no-sync ruff format --check .
+      - name: Mypy
+        run: uv run --no-sync mypy
+      - name: Migrations match models
+        run: uv run --no-sync alembic -c services/api/alembic.ini upgrade head && uv run --no-sync alembic -c services/api/alembic.ini check
+        env:
+          AETHER_DATABASE_URL: sqlite:///./ci-migrations.db
+      - name: Pytest
+        run: uv run --no-sync pytest
+
+  web:
+    name: Dashboard (lint, types, unit tests, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  e2e:
+    name: End-to-end (API + dashboard + Playwright)
+    runs-on: ubuntu-latest
+    needs: [python, web]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.32"
+          python-version: "3.13"
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install
+        run: |
+          scripts/install-cpu.sh .venv --dev
+          uv pip install --python .venv/bin/python --no-deps -e packages/trading_engine -e services/api
+          cd apps/web && npm ci && npx playwright install --with-deps chromium
+      - name: Seed a demo experiment
+        run: |
+          uv run --no-sync alembic -c services/api/alembic.ini upgrade head
+          uv run --no-sync aether demo --generations 2 --population 4 --seed 42
+      - name: Start API and dashboard
+        run: |
+          uv run --no-sync uvicorn aether_api.main:app --port 8000 > api.log 2>&1 &
+          (cd apps/web && npm run build && npm run start > ../../web.log 2>&1 &)
+          for i in $(seq 60); do curl -sf localhost:8000/api/v1/health && curl -sf -o /dev/null localhost:3000 && exit 0; sleep 2; done
+          cat api.log web.log; exit 1
+      - name: Playwright
+        working-directory: apps/web
+        run: npx playwright test
+      - name: Logs on failure
+        if: failure()
+        run: cat api.log web.log || true

@@ -1,0 +1,111 @@
+{
+  "written_at": "2026-10-11T01:07:20.350184+00:00",
+  "dataset_id": "ds_aa0bb65d9164",
+  "dataset_hash": "f92fc5d7b5c584f91f4d3a99b47cabebaec341d48331a820415b14a3d57a298c",
+  "code_version": "d8955fd05a6fb113f961da632bea224c02b8c7a5-dirty",
+  "dependencies": {
+    "python": "3.13.0",
+    "trading-engine": "0.1.0",
+    "numpy": "2.5.3",
+    "pandas": "2.3.3",
+    "pyarrow": "26.0.0",
+    "scikit-learn": "1.9.1",
+    "xgboost": "3.4.1",
+    "torch": "2.14.1",
+    "pydantic": "2.14.0",
+    "optuna": "4.9.0"
+  },
+  "symbols": [
+    "SPY",
+    "QQQ",
+    "AAPL",
+    "MSFT",
+    "NVDA"
+  ],
+  "main_grid": {
+    "population": 8,
+    "generations": 3,
+    "seeds": [
+      1,
+      2,
+      3
+    ]
+  },
+  "scaling": {
+    "symbol": "SPY",
+    "configs": [
+      [
+        16,
+        5
+      ],
+      [
+        32,
+        5
+      ]
+    ],
+    "seeds": [
+      1,
+      2
+    ]
+  },
+  "outer_test_fraction": 0.2,
+  "inner_holdout_fraction": 0.2,
+  "evaluation_config": {
+    "execution": {
+      "initial_capital": 10000.0,
+      "fee_bps": 1.0,
+      "fee_fixed": 0.0,
+      "slippage_bps": 5.0,
+      "fractional_shares": true,
+      "min_rebalance_weight": 0.02
+    },
+    "risk": {
+      "max_position": 1.0,
+      "min_cash_fraction": 0.0,
+      "max_daily_turnover": null,
+      "drawdown_circuit_breaker": null,
+      "breaker_cooldown_bars": 20,
+      "volatility_target": null,
+      "allow_short": false,
+      "allow_leverage": false
+    },
+    "walk_forward": {
+      "n_folds": 3,
+      "mode": "expanding",
+      "min_train_fraction": 0.45,
+      "rolling_window": null,
+      "embargo_bars": 5,
+      "horizon": 1
+    },
+    "ranking": {
+      "max_drawdown_limit": 0.5,
+      "min_round_trips": 5,
+      "stability_weight": 0.5,
+      "drawdown_weight": 1.0,
+      "turnover_weight": 0.01
+    },
+    "warnings": {
+      "min_round_trips": 10,
+      "high_drawdown": 0.3,
+      "excessive_turnover": 25.0,
+      "unstable_fold_sharpe_std": 1.0,
+      "single_period_share": 0.8,
+      "suspicious_sharpe": 2.0,
+      "suspicious_max_round_trips": 30,
+      "suspicious_max_years": 2.0,
+      "overfit_sharpe_gap": 1.0
+    },
+    "max_fit_seconds": 300.0
+  },
+  "bootstrap": {
+    "n_boot": 2000,
+    "mean_block": 20
+  },
+  "null_strategies": 300,
+  "selection_rules": {
+    "initial": "rank-1 eligible agent of generation 0",
+    "evolved": "rank-1 eligible agent of the last generation",
+    "search": "rank-1 eligible agent of the equal-budget random-search control"
+  },
+  "final_test_policy": "main-grid champions only; refit on full development; run once; no changes afterwards"
+}

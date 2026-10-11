@@ -8,9 +8,9 @@ kept short on purpose; the detailed design lives in `architecture.md`,
 
 - Empty repository; nothing to preserve.
 - Python 3.13, Node 22, uv, pnpm, PostgreSQL and Redis binaries available; 4 CPU, no GPU.
-- Docker CLI present but no daemon in the build sandbox, so Compose files are
-  written and statically validated, while local verification runs the services
-  directly (Postgres + Redis + uvicorn + Celery + Next.js).
+- Docker CLI present without a running daemon at first; development verified
+  the services directly (Postgres + Redis + uvicorn + Celery + Next.js), and the
+  Compose stack was built and exercised once a daemon was started.
 
 ## Key architecture decisions
 

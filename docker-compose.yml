@@ -1,0 +1,85 @@
+# AETHER local stack: Postgres, Redis, API, training worker, dashboard.
+#   cp .env.example .env && docker compose up --build
+# Then seed a demo experiment:  docker compose exec api aether demo
+name: aether
+
+x-api-env: &api-env
+  AETHER_ENVIRONMENT: ${AETHER_ENVIRONMENT:-development}
+  AETHER_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-aether}:${POSTGRES_PASSWORD:-aether}@postgres:5432/${POSTGRES_DB:-aether}
+  AETHER_REDIS_URL: redis://redis:6379/0
+  AETHER_JOB_BACKEND: celery
+  AETHER_API_KEY: ${AETHER_API_KEY:-}
+  AETHER_CORS_ORIGINS: ${AETHER_CORS_ORIGINS:-["http://localhost:3000"]}
+  AETHER_MAX_WORKERS_PER_JOB: ${AETHER_MAX_WORKERS_PER_JOB:-1}
+  AETHER_ENABLE_YAHOO: ${AETHER_ENABLE_YAHOO:-false}
+  AETHER_LOG_JSON: "true"
+
+x-api-build: &api-build
+  context: .
+  dockerfile: infra/docker/api.Dockerfile
+  args:
+    PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.13-slim}
+    TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
+    GIT_COMMIT: ${GIT_COMMIT:-unknown}
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aether}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aether}
+      POSTGRES_DB: ${POSTGRES_DB:-aether}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aether}"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: *api-build
+    image: aether-api:local
+    environment: *api-env
+    ports: ["${API_PORT:-8000}:8000"]
+    volumes: [aetherdata:/data]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    image: aether-api:local
+    command: ["celery", "-A", "aether_api.worker", "worker", "-Q", "training", "--concurrency=1", "--loglevel=INFO"]
+    environment: *api-env
+    volumes: [aetherdata:/data]
+    healthcheck:
+      disable: true
+    depends_on:
+      api: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: "${WORKER_CPUS:-2}", memory: "${WORKER_MEMORY:-4g}" }
+
+  web:
+    image: aether-web:local
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+    ports: ["${WEB_PORT:-3000}:3000"]
+    depends_on:
+      api: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  redisdata:
+  aetherdata:

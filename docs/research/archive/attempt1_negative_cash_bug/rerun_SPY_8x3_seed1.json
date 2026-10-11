@@ -1,0 +1,13 @@
+{
+  "key": "SPY|8x3|seed1",
+  "identical": false,
+  "differences": [
+    ".holdout_population.last_generation.mean_sharpe: 0.5266717619728934 != 0.5266717619728933"
+  ],
+  "stored_wall_seconds": 214.2,
+  "rerun_wall_seconds": 229.7,
+  "values_compared": 797,
+  "max_relative_difference": 2.11e-16,
+  "root_cause": "mean over a Python set of agent ids: set iteration order depends on per-process string-hash randomisation, and float addition is not associative. Fixed by sorting ids before averaging (scripts/research/phase2_study.py, pop_stats).",
+  "note": "The stored run used the pre-optimisation simulator; the rerun used the optimised one. All 796 other values (every Sharpe, return, CI bound, null percentile, cost row, genome, seed) are bit-identical."
+}
