@@ -77,3 +77,27 @@ limits are deliberate or known; read them before trusting any number.
 Nothing in AETHER is investment advice. A high rank, a positive final test, or
 a strategy that beats buy-and-hold in simulation is not evidence that it will
 make money in the future.
+
+## Known implementation limitations (Phase 2 audit)
+
+Recorded with evidence in `docs/PHASE2_AUDIT.md`:
+
+* **Selection-free holdout is not automatic.** Experiments rank every
+  generation on the same validation folds, so the best validation score can
+  only rise. The research harness (`scripts/research/phase2_study.py`)
+  measures generalisation on an inner holdout; the product does not yet do
+  this per experiment.
+* **Random baseline and window length.** The random agent draws its random
+  numbers in two blocks sized to the window, so the same day can get a
+  different decision in a longer window. This is not look-ahead (it never
+  reads prices), but it is not prefix-stable.
+* **Regime features are self-referential.** In the single-asset setting each
+  asset is its own "benchmark", so `bench_*` features repeat asset features.
+* **Rate limiting is per process, keyed on the client address.** Behind a
+  proxy, every client shares one address unless proxy headers are trusted.
+* **Job timeouts are cooperative.** A single long model fit cannot be
+  interrupted mid-fit; a worker-level hard limit is needed in production.
+* **Cross-platform bit-identity is not promised.** Results are bit-identical
+  on one machine (measured); across operating systems, CPUs or library
+  versions, expect last-bit floating-point differences
+  (`docs/REPRODUCIBILITY.md`).

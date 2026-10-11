@@ -71,6 +71,61 @@ Attached to every result (`evaluation/warnings.py`):
 | `below_benchmark` | trailed buy-and-hold |
 | `unstable_folds` | std of fold Sharpe above 1.0 |
 | `single_period_dependence` | one fold produced more than 80% of the total gain |
+| `suspiciously_strong` | validation Sharpe at least 2 with fewer than 30 round trips or under 2 years of validation data (high severity: usually luck, leakage or a bug) |
+| `overfit_gap` | in-sample (training-window) Sharpe exceeds validation Sharpe by more than 1.0 |
+
+Thresholds live in `WarningThresholds` and are part of the tournament's
+`EvaluationConfig`, so they are recorded in every manifest. Warnings never
+change a score; the ranking policy's hard exclusions are separate.
+
+## Training, validation and test performance
+
+Every number is labelled with the period it comes from:
+
+| Period | How it is produced | Used for selection? |
+| --- | --- | --- |
+| **Training (in-sample)** | Each fold's fitted agent is also simulated on the rows it was trained on (`train_sharpe_ratio`, `train_sharpe_mean`) | No; reporting only |
+| **Validation** | Walk-forward folds inside the development period | **Yes**: ranking, selection, evolution, Optuna |
+| **Final test** | Locked tail of the data; run once on agents fitted on all development data | Never |
+
+A large training -> validation drop is the classic overfitting signature
+(`overfit_gap`). A validation -> test drop is selection bias plus regime
+change. The Analytics page shows all three side by side.
+
+## Uncertainty: block-bootstrap intervals
+
+Point estimates of Sharpe ratio from a few years of daily data are noisy.
+For each final-generation agent the analytics endpoint reports 95%
+**stationary block bootstrap** intervals (Politis & Romano; geometric blocks,
+mean 20 sessions, 1,000 resamples) for:
+
+* the annualised Sharpe ratio, with P(Sharpe > 0);
+* the annualised **excess return over buy-and-hold**. Agent and benchmark
+  days are resampled with the same indices, so their correlation is kept.
+
+Assumptions: returns are stationary and only weakly dependent within the
+window. Blocks preserve short-range dependence such as volatility
+clustering; ordinary i.i.d. resampling would understate uncertainty. The
+implementation is tested for nominal coverage (90% intervals cover a known
+true Sharpe in 80-97% of simulated trials) and for widening under
+autocorrelation (AR(1), phi = 0.5: intervals 1.3-2.1x wider than i.i.d.,
+theory 1.73x). An interval that spans zero is shown in amber: the data cannot
+distinguish the result from no effect.
+
+## Random-strategy null and cost sensitivity (research harness)
+
+`trading_engine.research` also provides:
+
+* **Random null**: the Sharpe distribution of N seeded random long/flat
+  strategies through the same simulator, window and costs. An agent's
+  percentile in it measures how unusual its result is compared with luck,
+  without distributional assumptions.
+* **Cost sensitivity**: the same target weights re-simulated with fees and
+  slippage scaled 0x, 1x, 2x, 5x and 10x. This is exact, because decisions do
+  not depend on costs.
+
+Both are used in `scripts/research/phase2_study.py`; results are in
+`docs/EVOLUTION_RESEARCH.md` and `docs/research/PHASE2_TABLES.md`.
 
 ## Multiple comparisons
 
@@ -91,8 +146,9 @@ not), not a formal test; the Deflated Sharpe Ratio would be the next step.
   and score, per family (descriptive; small samples).
 - **Regimes**: annualised mean return when trailing 60-day buy-and-hold trend
   was up or down, and volatility high or low.
-- **Generalisation gap**: validation versus final-test Sharpe and excess
-  return per agent, with contaminated runs labelled.
+- **Generalisation gap**: training versus validation versus final-test Sharpe
+  and excess return per agent, with contaminated runs labelled.
+- **Uncertainty**: bootstrap intervals (above).
 - **Optuna trials**: objective per trial, pruned and failed trials.
 
 ## Example: the bundled demo
