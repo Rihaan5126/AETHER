@@ -5,6 +5,7 @@ python -m aether_api.cli demo [--generations 3 --population 8]
 python -m aether_api.cli import-yahoo --symbols SPY [--start 2005-01-01 --end 2026-10-09]
 python -m aether_api.cli datasets
 python -m aether_api.cli experiment --dataset <id> --symbol SPY [--generations 3 ...]
+python -m aether_api.cli final-test --experiment <id>
 """
 
 from __future__ import annotations
@@ -19,10 +20,14 @@ from aether_api.core.config import get_settings
 from aether_api.database.models import Base, Dataset, Experiment
 from aether_api.database.session import get_engine, session_scope
 from aether_api.schemas.datasets import DatasetImportRequest
-from aether_api.schemas.experiments import ExperimentCreateRequest
+from aether_api.schemas.experiments import ExperimentCreateRequest, FinalTestRequest
 from aether_api.services import runner  # noqa: F401
 from aether_api.services.datasets import import_synthetic, import_yahoo, register_manifest
-from aether_api.services.experiments import create_experiment, start_experiment
+from aether_api.services.experiments import (
+    create_experiment,
+    request_final_test,
+    start_experiment,
+)
 from aether_api.services.jobs import run_job
 from aether_api.services.storage import ensure_dirs
 
@@ -113,6 +118,43 @@ def import_yahoo_dataset(
         }
 
 
+def final_test(experiment_id: str) -> dict[str, object]:
+    """Run the locked final test once, on the default (top-ranked) final-generation agents.
+
+    There is deliberately no override here: a second run must go through the API
+    with acknowledge_contamination=true, which marks the experiment contaminated.
+    """
+    with session_scope() as db:
+        exp = db.get(Experiment, experiment_id)
+        if exp is None:
+            raise SystemExit(f"unknown experiment {experiment_id}")
+        run, job = request_final_test(db, exp, FinalTestRequest())
+        run_id, job_id = run.id, job.id
+    run_job(job_id)
+    with session_scope() as db:
+        from aether_api.database.models import FinalTestRun  # noqa: PLC0415
+
+        done = db.get(FinalTestRun, run_id)
+        assert done is not None
+        return {
+            "final_test_run": done.id,
+            "status": done.status,
+            "test_period": done.test_period,
+            "benchmark": {
+                k: (done.benchmark_metrics or {}).get(k) for k in ("total_return", "sharpe_ratio")
+            },
+            "agents": [
+                {
+                    "agent_id": r["agent_id"],
+                    "total_return": r["metrics"].get("total_return"),
+                    "sharpe_ratio": r["metrics"].get("sharpe_ratio"),
+                    "excess_return": r["metrics"].get("excess_return"),
+                }
+                for r in done.results or []
+            ],
+        }
+
+
 def list_datasets() -> list[dict[str, object]]:
     init_db()
     with session_scope() as db:
@@ -163,6 +205,9 @@ def main() -> None:
     e.add_argument("--folds", type=int, default=3)
     e.add_argument("--test-fraction", type=float, default=0.2)
 
+    ft = sub.add_parser("final-test", help="run the locked final test once")
+    ft.add_argument("--experiment", required=True)
+
     args = parser.parse_args()
     if args.cmd == "init-db":
         init_db()
@@ -174,6 +219,8 @@ def main() -> None:
         print(json.dumps(result, indent=2))
     elif args.cmd == "datasets":
         print(json.dumps(list_datasets(), indent=2))
+    elif args.cmd == "final-test":
+        print(json.dumps(final_test(args.experiment), indent=2, default=str))
     else:
         ensure_dirs()
         init_db()

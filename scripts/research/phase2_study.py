@@ -327,10 +327,12 @@ def run_selection(
     }
 
     def pop_stats(ids: set[str | None]) -> dict[str, Any]:
+        # Sorted: set order varies between processes (hash randomisation), and float
+        # addition is not associative, so an unsorted mean can differ in the last bit.
         vals = [
             hold["agents"][i]["sharpe_ratio"]
-            for i in ids
-            if i and hold["agents"][i]["sharpe_ratio"] is not None
+            for i in sorted(i for i in ids if i)
+            if hold["agents"][i]["sharpe_ratio"] is not None
         ]
         return {
             "n": len(vals),
