@@ -112,10 +112,9 @@ def bench_sim(repeat: int) -> dict[str, Any]:
         "SPY", np_concat(dev.bars, test.bars), np_concat(dev.features, test.features)
     )
     obs = Observations("SPY", full.features, full.bars)
-    out: dict[str, Any] = {
-        "engine_path": str(Path(trading_engine.__file__).parent),
-        "bars": len(full.bars),
-    }
+    # Which checkout was measured (before/after runs), without the host's absolute path.
+    engine = Path(trading_engine.__file__).resolve().parent
+    out: dict[str, Any] = {"engine_path": "/".join(engine.parts[-4:]), "bars": len(full.bars)}
     for name, genome, seed in [
         ("random (trade-heavy)", RandomGenome(), 1),
         ("momentum ma_cross (few trades)", MomentumGenome(), 1),

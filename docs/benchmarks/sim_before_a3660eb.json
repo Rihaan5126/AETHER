@@ -24,7 +24,7 @@
   },
   "measured_at": "2026-10-11T15:14:06",
   "sim": {
-    "engine_path": "C:\\Users\\Yoga\\AppData\\Local\\Temp\\claude\\C--Users-Yoga-Downloads-AETHER\\b46e6f63-97d3-4433-83a0-cd7b41b1e18f\\scratchpad\\before_opt\\packages\\trading_engine\\src\\trading_engine",
+    "engine_path": "<git worktree of commit a3660eb>/packages/trading_engine/src/trading_engine",
     "bars": 5477,
     "random (trade-heavy)": {
       "trades": 284,

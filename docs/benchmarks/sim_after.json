@@ -24,7 +24,7 @@
   },
   "measured_at": "2026-10-11T15:14:30",
   "sim": {
-    "engine_path": "C:\\Users\\Yoga\\Downloads\\AETHER\\packages\\trading_engine\\src\\trading_engine",
+    "engine_path": "<repo>\\packages\\trading_engine\\src\\trading_engine",
     "bars": 5477,
     "random (trade-heavy)": {
       "trades": 284,
