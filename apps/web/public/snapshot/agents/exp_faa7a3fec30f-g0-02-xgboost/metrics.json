@@ -1,0 +1,1 @@
+{"agent_id":"exp_faa7a3fec30f-g0-02-xgboost","results":[{"tournament_id":"trn_2cd1c7583cc6","generation":0,"period":"validation","rank":10,"score":null,"status":"excluded","status_reason":"failed: AssertionError: simulator produced negative cash","metrics":{},"fold_metrics":[],"score_components":{},"warnings":[],"risk_events":[]}],"final_test":[]}
