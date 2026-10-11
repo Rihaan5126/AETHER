@@ -23,7 +23,7 @@ import {
 import { EmptyState } from "@/components/ui/misc";
 import type { EquitySeries } from "@/lib/api/schemas";
 import { pct } from "@/lib/format";
-import { histogram, mergeSeries, periodReturns, rollingVolatility } from "@/lib/series";
+import { histogram, mergeSeries, periodReturns, rollingReturn, rollingVolatility } from "@/lib/series";
 
 import { AXIS, BENCHMARK_STYLE, GRID, TOOLTIP } from "./theme";
 
@@ -151,13 +151,25 @@ export function ReturnDistribution({ series, height = 220 }: { series: NamedSeri
   );
 }
 
-export function RollingVolChart({ series, height = 200, window = 20 }: { series: NamedSeries[]; height?: number; window?: number }) {
+function RollingLines({
+  series,
+  height,
+  values,
+  pctDigits,
+  zeroLine,
+}: {
+  series: NamedSeries[];
+  height: number;
+  values: (s: NamedSeries) => { t: string; v: number | null }[];
+  pctDigits: number;
+  zeroLine?: boolean;
+}) {
   if (!series.length) return <NoData height={height} />;
   const merged = new Map<string, Record<string, number | string | null>>();
   for (const s of series) {
-    for (const p of rollingVolatility(s.series.points, window)) {
+    for (const p of values(s)) {
       const row = merged.get(p.t) ?? { t: p.t };
-      row[s.key] = p.vol;
+      row[s.key] = p.v;
       merged.set(p.t, row);
     }
   }
@@ -169,12 +181,36 @@ export function RollingVolChart({ series, height = 200, window = 20 }: { series:
         <CartesianGrid {...GRID} />
         <XAxis dataKey="t" {...AXIS} tickFormatter={yearTick} minTickGap={48} />
         <YAxis {...AXIS} width={48} tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`} />
-        <Tooltip {...TOOLTIP} formatter={(v, name) => [pct(Number(v), 1), labels[String(name)] ?? String(name)]} />
+        {zeroLine ? <ReferenceLine y={0} stroke="var(--color-line-strong)" /> : null}
+        <Tooltip {...TOOLTIP} formatter={(v, name) => [pct(Number(v), pctDigits), labels[String(name)] ?? String(name)]} />
         {series.map((s) => (
           <Line key={s.key} dataKey={s.key} stroke={s.color} dot={false} strokeWidth={1.3} isAnimationActive={false} connectNulls={false} />
         ))}
       </LineChart>
     </ResponsiveContainer>
+  );
+}
+
+export function RollingVolChart({ series, height = 200, window = 20 }: { series: NamedSeries[]; height?: number; window?: number }) {
+  return (
+    <RollingLines
+      series={series}
+      height={height}
+      pctDigits={1}
+      values={(s) => rollingVolatility(s.series.points, window).map((p) => ({ t: p.t, v: p.vol }))}
+    />
+  );
+}
+
+export function RollingReturnChart({ series, height = 200, window = 60 }: { series: NamedSeries[]; height?: number; window?: number }) {
+  return (
+    <RollingLines
+      series={series}
+      height={height}
+      pctDigits={1}
+      zeroLine
+      values={(s) => rollingReturn(s.series.points, window).map((p) => ({ t: p.t, v: p.ret }))}
+    />
   );
 }
 

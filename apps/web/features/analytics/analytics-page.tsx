@@ -19,6 +19,54 @@ function heat(v: number | null): string {
   return v >= 0 ? `rgba(92,196,151,${a})` : `rgba(236,123,130,${a})`;
 }
 
+function Interval({ i, format }: { i: NonNullable<Analytics["uncertainty"]>[number]["sharpe"]; format: (v: number | null) => string }) {
+  if (i.estimate === null || i.low === null || i.high === null) return <span className="text-fg-subtle">undefined</span>;
+  const straddles = i.low < 0 && i.high > 0;
+  return (
+    <span className="font-mono">
+      {format(i.estimate)} <span className={straddles ? "text-warn" : "text-fg-subtle"}>[{format(i.low)}, {format(i.high)}]</span>
+    </span>
+  );
+}
+
+function UncertaintyCard({ rows }: { rows: NonNullable<Analytics["uncertainty"]> }) {
+  return (
+    <Card>
+      <CardHeader
+        title="Uncertainty (final generation)"
+        description="95% stationary block-bootstrap intervals (mean block 20 sessions) on stitched validation returns. Agent and buy-and-hold days are resampled together. An interval that spans zero is shown in amber: the data cannot tell the result apart from no effect."
+        actions={<PeriodBadge period="validation" />}
+      />
+      <CardBody className="p-0">
+        <Table>
+          <thead>
+            <tr>
+              <Th>Agent</Th>
+              <Th className="text-right">Train Sharpe</Th>
+              <Th className="text-right">Validation Sharpe [95% CI]</Th>
+              <Th className="text-right">P(Sharpe &gt; 0)</Th>
+              <Th className="text-right">Excess vs B&amp;H, annual [95% CI]</Th>
+              <Th className="text-right">P(excess &gt; 0)</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((u) => (
+              <Tr key={u.agent_id}>
+                <Td><span className="flex items-center gap-2"><AlgoTag algorithm={u.algorithm} /><span className="font-mono text-fg-subtle">{shortAgentId(u.agent_id)}</span></span></Td>
+                <Td className="text-right font-mono text-fg-subtle">{u.algorithm === "buy_and_hold" ? "n/a" : num(u.train_sharpe ?? null)}</Td>
+                <Td className="text-right"><Interval i={u.sharpe} format={(v) => num(v)} /></Td>
+                <Td className="text-right font-mono">{pct(u.sharpe.prob_positive, 0)}</Td>
+                <Td className="text-right">{u.algorithm === "buy_and_hold" ? <span className="text-fg-subtle">benchmark</span> : <Interval i={u.excess_return} format={(v) => pct(v, 1, true)} />}</Td>
+                <Td className="text-right font-mono">{u.algorithm === "buy_and_hold" ? "" : pct(u.excess_return.prob_positive, 0)}</Td>
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
+      </CardBody>
+    </Card>
+  );
+}
+
 function FoldHeatmap({ rows }: { rows: NonNullable<Analytics["fold_performance"]> }) {
   const nFolds = Math.max(0, ...rows.map((r) => r.folds.length));
   return (
@@ -120,12 +168,13 @@ export function AnalyticsPage() {
               <CardHeader title="Generalisation gap" description="Validation (folds) against the locked test period, per final-test run" actions={<PeriodBadge period="test" />} />
               <CardBody className="p-0">
                 <Table>
-                  <thead><tr><Th>Run</Th><Th>Agent</Th><Th className="text-right">Val Sharpe</Th><Th className="text-right">Test Sharpe</Th><Th className="text-right">Val excess</Th><Th className="text-right">Test excess</Th></tr></thead>
+                  <thead><tr><Th>Run</Th><Th>Agent</Th><Th className="text-right">Train Sharpe</Th><Th className="text-right">Val Sharpe</Th><Th className="text-right">Test Sharpe</Th><Th className="text-right">Val excess</Th><Th className="text-right">Test excess</Th></tr></thead>
                   <tbody>
                     {gap.map((g) => (
                       <Tr key={`${g.run_number}-${g.agent_id}`}>
                         <Td>#{g.run_number}{g.contaminated ? <Badge tone="warn" className="ml-2">contaminated</Badge> : null}</Td>
                         <Td><span className="flex items-center gap-2"><AlgoTag algorithm={g.algorithm} /><span className="font-mono text-fg-subtle">{shortAgentId(g.agent_id)}</span></span></Td>
+                        <Td className="text-right font-mono text-fg-subtle">{num(g.train_sharpe)}</Td>
                         <Td className="text-right font-mono">{num(g.validation_sharpe)}</Td>
                         <Td className="text-right font-mono">{num(g.test_sharpe)}</Td>
                         <Td className={`text-right font-mono ${signClass(g.validation_excess)}`}>{pct(g.validation_excess, 1, true)}</Td>
@@ -137,6 +186,8 @@ export function AnalyticsPage() {
               </CardBody>
             </Card>
           ) : null}
+
+          {d.uncertainty?.length ? <UncertaintyCard rows={d.uncertainty} /> : null}
 
           <Card>
             <CardHeader title="Sharpe by fold (final generation)" description="Large spread between folds suggests results depend on the period, not the strategy." />

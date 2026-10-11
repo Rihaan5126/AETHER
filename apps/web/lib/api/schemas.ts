@@ -347,6 +347,9 @@ export const TradeRow = z.object({
 });
 export type TradeRow = z.infer<typeof TradeRow>;
 
+/** Stationary block-bootstrap interval (see trading_engine.research.robustness). */
+export const BootInterval = z.object({ estimate: num, low: num, high: num, prob_positive: num });
+
 export const Analytics = z.object({
   experiment_id: z.string(),
   available: z.boolean(),
@@ -399,12 +402,22 @@ export const Analytics = z.object({
     .array(
       z.object({
         run_number: z.number(), agent_id: z.string(), algorithm: z.string(),
+        train_sharpe: num.optional(),
         validation_sharpe: num, test_sharpe: num, validation_return: num, test_return: num,
         validation_excess: num, test_excess: num, contaminated: z.boolean(),
       }),
     )
     .optional(),
   regimes: z.array(json).optional(),
+  uncertainty: z
+    .array(
+      z.object({
+        agent_id: z.string(), algorithm: z.string(), status: z.string(), sessions: z.number(),
+        train_sharpe: num.optional(), validation_sharpe: num,
+        sharpe: BootInterval, excess_return: BootInterval,
+      }),
+    )
+    .optional(),
   multiple_comparisons: z
     .object({
       agents_evaluated: z.number(),

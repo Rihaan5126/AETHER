@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, FlaskConical, Lock, Sparkles, Square } from "lucide-react";
+import { AlertTriangle, Download, FlaskConical, Lock, Sparkles, Square } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
@@ -13,7 +13,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Field, Input, Select } from "@/components/ui/input";
 import { EmptyState, ErrorState, KeyValue, Progress, Skeleton, Stat } from "@/components/ui/misc";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
-import { api } from "@/lib/api/client";
+import { api, downloadUrl } from "@/lib/api/client";
 import * as S from "@/lib/api/schemas";
 import { algoColor, ALGORITHM_LABEL, dateTime, duration, num, pct, relative, shortAgentId, signClass } from "@/lib/format";
 import { keys, useExperiment, useFinalTestCurves } from "@/lib/queries";
@@ -282,7 +282,16 @@ export function ExperimentMonitor({ id }: { id: string }) {
             </CardBody>
           </Card>
           <Card>
-            <CardHeader title="Reproducibility manifest" />
+            <CardHeader
+              title="Reproducibility manifest"
+              actions={
+                <Button asChild size="sm">
+                  <a href={downloadUrl(`/experiments/${exp.id}/manifest`)} download={`aether-${exp.id}.json`}>
+                    <Download /> Download JSON
+                  </a>
+                </Button>
+              }
+            />
             <CardBody>
               <KeyValue rows={[
                 ["Dataset hash", String(manifest.dataset_hash ?? (config.dataset_hash as string) ?? "—")],

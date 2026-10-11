@@ -219,3 +219,18 @@ def test_failed_agent_is_recorded_not_dropped(dev_test, monkeypatch):
     out = run_tournament([AgentSpec("bad", default_genome("xgboost"), 1)], dev, FAST_EVAL)
     ev = out.evaluations[0]
     assert ev.status == "excluded" and "boom" in (ev.error or "")
+
+
+def test_parallel_tournament_matches_serial(dev_test):
+    """Process-pool evaluation must give bit-identical results to the serial path."""
+    dev, _ = dev_test
+    specs = [
+        AgentSpec("p-mom", default_genome("momentum"), 1),
+        AgentSpec("p-xgb", parse_genome({"family": "xgboost", "n_estimators": 60}), 2),
+        AgentSpec("p-mlp", parse_genome({"family": "mlp", "max_epochs": 8}), 3),
+    ]
+    serial = run_tournament(specs, dev, FAST_EVAL, max_workers=1)
+    parallel = run_tournament(specs, dev, FAST_EVAL, max_workers=2)
+    a = {e.agent_id: (e.score, e.metrics, e.fold_metrics) for e in serial.evaluations}
+    b = {e.agent_id: (e.score, e.metrics, e.fold_metrics) for e in parallel.evaluations}
+    assert a == b

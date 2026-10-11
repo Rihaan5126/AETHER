@@ -34,6 +34,7 @@ from aether_api.schemas.experiments import (
 from aether_api.schemas.jobs import JobOut
 from aether_api.services import experiments as svc
 from aether_api.services import queries
+from aether_api.services.export import export_experiment
 from aether_api.services.jobs import enqueue
 
 router = APIRouter(prefix="/experiments", tags=["experiments"])
@@ -291,6 +292,18 @@ def optimize(
     db.commit()
     enqueue(job.id)
     return JobRef(job_id=job.id, status=job.status)
+
+
+@router.get("/{experiment_id}/manifest")
+def experiment_manifest(experiment_id: str, db: Session = Depends(get_db)) -> Response:
+    """Download a self-contained JSON export for auditing or reproducing the experiment."""
+    from fastapi.responses import JSONResponse  # noqa: PLC0415
+
+    exp = _get(db, experiment_id)
+    return JSONResponse(
+        export_experiment(db, exp),
+        headers={"Content-Disposition": f'attachment; filename="aether-{exp.id}.json"'},
+    )
 
 
 @router.get("/{experiment_id}/lineage", response_model=LineageGraph)

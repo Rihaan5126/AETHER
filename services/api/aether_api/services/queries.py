@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from trading_engine.agents.genomes import GENOME_TYPES
 from trading_engine.evolution import numeric_genes
+from trading_engine.research import bootstrap_performance
 
 from aether_api.core.errors import not_found
 from aether_api.database.models import (
@@ -336,6 +337,44 @@ def _regime_returns(curves: pd.DataFrame, agent_ids: list[str]) -> list[dict[str
     return out
 
 
+def _uncertainty(
+    curves: pd.DataFrame, rows: list[dict[str, Any]], results: dict[str, TournamentResult]
+) -> list[dict[str, Any]]:
+    """Stationary block-bootstrap intervals on each agent's stitched validation returns.
+
+    Agent and benchmark days are resampled together (paired), so the excess-return
+    interval accounts for their correlation. See trading_engine.research.robustness.
+    """
+    if curves.empty:
+        return []
+    wide = curves.pivot_table(index="timestamp", columns="agent_id", values="equity").sort_index()
+    if BENCHMARK_CURVE_ID not in wide:
+        return []
+    rets = wide.pct_change().iloc[1:]
+    bench = rets[BENCHMARK_CURVE_ID]
+    out = []
+    for row in rows:
+        aid = row["agent_id"]
+        if aid not in rets or (row["is_benchmark"] and row["algorithm"] != "buy_and_hold"):
+            continue
+        r = rets[aid]
+        boot = bootstrap_performance(r, bench, n_boot=1000, mean_block=20, seed=0)
+        metrics = (results[aid].metrics_json or {}) if aid in results else {}
+        out.append(
+            {
+                "agent_id": aid,
+                "algorithm": row["algorithm"],
+                "status": row["status"],
+                "sessions": int(r.notna().sum()),
+                "train_sharpe": metrics.get("train_sharpe_mean"),
+                "validation_sharpe": row["sharpe_ratio"],
+                "sharpe": boot["sharpe"],
+                "excess_return": boot["annual_excess_return"],
+            }
+        )
+    return out
+
+
 def experiment_analytics(db: Session, exp: Experiment) -> dict[str, Any]:
     tournaments = db.scalars(
         select(Tournament).where(Tournament.experiment_id == exp.id).order_by(Tournament.generation)
@@ -476,6 +515,17 @@ def experiment_analytics(db: Session, exp: Experiment) -> dict[str, Any]:
 
     curves = _curve_file(db, tournament_id=final_t.id)
     regime = _regime_returns(curves, [r["agent_id"] for r in final_rows])
+    uncertainty = _uncertainty(curves, final_rows, results)
+    train_sharpe = {
+        r.agent_id: (r.metrics_json or {}).get("train_sharpe_mean")
+        for r in db.scalars(
+            select(TournamentResult).where(
+                TournamentResult.tournament_id.in_([t.id for t in tournaments])
+            )
+        )
+    }
+    for row in gap:
+        row["train_sharpe"] = train_sharpe.get(row["agent_id"])
 
     runs_all = db.scalars(select(TrainingRun).where(TrainingRun.experiment_id == exp.id)).all()
     n_unique = sum(1 for r in runs_all if not (r.training_metrics or {}).get("cached_from"))
@@ -518,6 +568,7 @@ def experiment_analytics(db: Session, exp: Experiment) -> dict[str, Any]:
         "parameter_sensitivity": sensitivity,
         "generalisation": gap,
         "regimes": regime,
+        "uncertainty": uncertainty,
         "multiple_comparisons": multiple,
         "optimization": [
             {

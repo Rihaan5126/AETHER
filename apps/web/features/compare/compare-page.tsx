@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import * as React from "react";
 
 import { SERIES_COLORS } from "@/components/charts/theme";
-import { DrawdownChart, EquityChart, FoldBars, ReturnDistribution, RollingVolChart } from "@/components/charts/charts";
+import { DrawdownChart, EquityChart, FoldBars, ReturnDistribution, RollingReturnChart, RollingVolChart } from "@/components/charts/charts";
 import { AlgoTag, PageHeader, PeriodBadge, ResearchNote } from "@/components/domain";
 import { ExperimentSelect, useExperimentParam } from "@/components/experiment-select";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,8 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/ui/misc";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import type { LeaderboardRow } from "@/lib/api/schemas";
 import { dateTime, int, money, num, pct, shortAgentId, signClass } from "@/lib/format";
-import { useAgentMetrics, useEquityCurves, useLeaderboard, useTournaments, useTrades } from "@/lib/queries";
+import { flattenGenome } from "@/lib/genome";
+import { useAgentMetrics, useAgents, useEquityCurves, useLeaderboard, useTournaments, useTrades } from "@/lib/queries";
 
 const MAX_COMPARE = 4;
 
@@ -56,6 +57,61 @@ function FoldComparison({ ids, names }: { ids: string[]; names: Record<string, L
       rows={[...folds.entries()].sort((a, b) => a[0] - b[0]).map(([, r]) => r)}
       keys={ids.map((id, i) => ({ key: id, label: names[id]?.agent_name ?? id, color: SERIES_COLORS[i]! }))}
     />
+  );
+}
+
+function ConfigurationCard({
+  ids,
+  names,
+  experimentId,
+  generation,
+}: {
+  ids: string[];
+  names: Record<string, { agent_name: string }>;
+  experimentId: string | undefined;
+  generation: number;
+}) {
+  const agents = useAgents({ experiment_id: experimentId, generation });
+  const byId = Object.fromEntries((agents.data?.items ?? []).map((a) => [a.id, a]));
+  const flat = ids.map((id) => {
+    const a = byId[id];
+    if (!a) return {} as Record<string, string>;
+    const genome = { ...(a.genome as Record<string, unknown>) };
+    const features = genome.features;
+    delete genome.features;
+    return {
+      ...flattenGenome(genome),
+      ...(Array.isArray(features) ? { features: `${features.length} selected` } : {}),
+      seed: String(a.seed),
+      origin: a.origin,
+    };
+  });
+  const keys = [...new Set(flat.flatMap((f) => Object.keys(f)))].filter((k) => k !== "family").sort();
+  return (
+    <Card className="xl:col-span-2">
+      <CardHeader title="Model configuration" description="Genome of each agent; rows where the agents differ are highlighted" />
+      <CardBody className="p-0">
+        {agents.isLoading ? (
+          <Skeleton className="m-4 h-40" />
+        ) : (
+          <Table>
+            <thead><tr><Th>Gene</Th>{ids.map((id) => <Th key={id} className="text-right">{names[id]?.agent_name ?? shortAgentId(id)}</Th>)}</tr></thead>
+            <tbody>
+              {keys.map((k) => {
+                const vals = flat.map((f) => f[k] ?? "—");
+                const differs = new Set(vals).size > 1;
+                return (
+                  <Tr key={k}>
+                    <Td className={differs ? "text-fg" : "text-fg-subtle"}>{k}</Td>
+                    {vals.map((v, i) => <Td key={ids[i]} className={`text-right font-mono ${differs ? "text-accent" : "text-fg-muted"}`}>{v}</Td>)}
+                  </Tr>
+                );
+              })}
+            </tbody>
+          </Table>
+        )}
+      </CardBody>
+    </Card>
   );
 }
 
@@ -148,6 +204,8 @@ export function ComparePage() {
                 <Card><CardHeader title="Drawdown" /><CardBody><DrawdownChart series={withBench} height={320} /></CardBody></Card>
                 <Card><CardHeader title="Daily return distribution" /><CardBody><ReturnDistribution series={withBench} /></CardBody></Card>
                 <Card><CardHeader title="Rolling 20-day volatility" description="Annualised" /><CardBody><RollingVolChart series={withBench} /></CardBody></Card>
+                <Card><CardHeader title="Rolling 60-day return" description="Trailing return of the chained validation curve" /><CardBody><RollingReturnChart series={withBench} /></CardBody></Card>
+                <ConfigurationCard ids={ids} names={names} experimentId={experimentId} generation={selected.generation} />
               </div>
 
               <div className="grid gap-6 xl:grid-cols-3">

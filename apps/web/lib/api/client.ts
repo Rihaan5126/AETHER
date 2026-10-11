@@ -86,6 +86,11 @@ export async function snapshotRequest<T extends z.ZodTypeAny>(
   return parsed.data;
 }
 
+/** URL of a downloadable file served by the API, or by the snapshot in read-only mode. */
+export function downloadUrl(path: string): string {
+  return SNAPSHOT ? snapshotUrl(resolveSnapshot(path).file) : buildUrl(path);
+}
+
 export const api = {
   get: <T extends z.ZodTypeAny>(schema: T, path: string, query?: Query) =>
     request(schema, path, { method: "GET", query }),

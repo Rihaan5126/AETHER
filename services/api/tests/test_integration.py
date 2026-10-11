@@ -100,6 +100,16 @@ def test_analytics(client, completed_experiment):
     assert a["available"] and len(a["generations"]) == 2
     assert a["multiple_comparisons"]["agents_evaluated"] >= 4
     assert a["regimes"] and a["fold_performance"]
+    unc = a["uncertainty"]
+    assert {u["algorithm"] for u in unc} >= {"buy_and_hold"}
+    assert "random" not in {u["algorithm"] for u in unc}
+    for u in unc:
+        s = u["sharpe"]
+        if s["estimate"] is not None:
+            assert s["low"] <= s["estimate"] <= s["high"]
+            assert 0.0 <= s["prob_positive"] <= 1.0
+        if u["algorithm"] != "buy_and_hold":
+            assert "train_sharpe" in u
 
 
 def test_optimisation_study(client, completed_experiment):
@@ -168,3 +178,61 @@ def test_cancellation(client, dataset_id):
     assert client.get(f"{API}/experiments/{exp['id']}").json()["status"] == "cancelled"
     # completed/cancelled experiments are immutable: restarting is refused
     assert client.post(f"{API}/experiments/{exp['id']}/start").status_code == 409
+
+
+def test_manifest_export_is_self_contained(client, completed_experiment):
+    exp = completed_experiment
+    r = client.get(f"{API}/experiments/{exp['id']}/manifest")
+    assert r.status_code == 200
+    assert f'filename="aether-{exp["id"]}.json"' in r.headers["content-disposition"]
+    doc = r.json()
+    assert doc["format"] == "aether-experiment-export" and doc["format_version"] == 1
+    assert (
+        doc["dataset"]["hash"] == exp["config"]["dataset_hash"] == doc["manifest"]["dataset_hash"]
+    )
+    assert doc["manifest"]["code_version"] and doc["manifest"]["dependencies"]["torch"]
+    ea = doc["execution_assumptions"]
+    assert ea["execution_delay_bars"] == 1 and ea["execution_price"] == "open"
+    assert ea["execution"]["fee_bps"] == 1.0 and ea["walk_forward"]["n_folds"] == 2
+    assert len(doc["features"]["names"]) == 25
+    last_gen = max(a["generation"] for a in doc["agents"])
+    final_learned = [
+        a for a in doc["agents"] if a["generation"] == last_gen and a["algorithm"] == "xgboost"
+    ]
+    assert all(len(a["artifact"]["sha256"]) == 64 for a in final_learned)
+    assert len(doc["tournaments"]) == 2 and all(len(t["results"]) == 6 for t in doc["tournaments"])
+    assert all(rec["genome_after"] for rec in doc["lineage"])
+
+
+def _comparable(doc: dict) -> list[list[tuple]]:
+    """Tournament outcomes without run-specific ids or timings."""
+    genomes = {a["id"]: (a["algorithm"], a["genome"], a["seed"]) for a in doc["agents"]}
+    return [
+        [
+            (
+                genomes[r["agent_id"]],
+                r["rank"],
+                r["status"],
+                r["score"],
+                r["metrics"],
+            )
+            for r in t["results"]
+        ]
+        for t in doc["tournaments"]
+    ]
+
+
+def test_identical_config_reproduces_identical_results(client, dataset_id, completed_experiment):
+    """Run the same configuration again: every genome, rank, score and metric must match.
+
+    Determinism is exact here (single-threaded XGBoost/RF, deterministic torch), so
+    the comparison is exact; see docs/REPRODUCIBILITY.md for tolerances elsewhere.
+    """
+    body = {**SMALL_EXPERIMENT, "name": "integration rerun", "dataset_id": dataset_id}
+    exp = client.post(f"{API}/experiments", json=body).json()
+    job = wait_for_job(client, client.post(f"{API}/experiments/{exp['id']}/start").json()["job_id"])
+    assert job["status"] == "completed", job
+    first = client.get(f"{API}/experiments/{completed_experiment['id']}/manifest").json()
+    second = client.get(f"{API}/experiments/{exp['id']}/manifest").json()
+    assert first["manifest"]["config"] == {**second["manifest"]["config"], "name": "integration"}
+    assert _comparable(first) == _comparable(second)

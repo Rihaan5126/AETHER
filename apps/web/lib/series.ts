@@ -70,6 +70,14 @@ export function rollingVolatility(points: CurvePoint[], window = 20, periodsPerY
   });
 }
 
+/** Trailing return of the (chained) equity curve over `window` periods. */
+export function rollingReturn(points: CurvePoint[], window = 60): { t: string; ret: number | null }[] {
+  return points.map((p, i) => {
+    const prev = i >= window ? points[i - window]! : undefined;
+    return { t: p.t, ret: prev && prev.equity > 0 ? p.equity / prev.equity - 1 : null };
+  });
+}
+
 export function mean(values: number[]): number | null {
   return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 }

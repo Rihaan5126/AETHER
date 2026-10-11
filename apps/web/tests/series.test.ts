@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CurvePoint } from "@/lib/api/schemas";
-import { histogram, mean, mergeSeries, periodReturns, rollingVolatility } from "@/lib/series";
+import { histogram, mean, mergeSeries, periodReturns, rollingReturn, rollingVolatility } from "@/lib/series";
 
 const pt = (t: string, equity: number, fold = 0): CurvePoint => ({ t, equity, drawdown: 0, weight: 1, fold });
 
@@ -47,5 +47,13 @@ describe("series", () => {
   it("averages", () => {
     expect(mean([])).toBeNull();
     expect(mean([1, 2, 3])).toBe(2);
+  });
+});
+
+describe("rollingReturn", () => {
+  it("is the trailing return over the window and null before it", () => {
+    const pts = [100, 110, 121, 133.1].map((equity, i) => pt(`2020-01-0${i + 1}`, equity));
+    const out = rollingReturn(pts, 2);
+    expect(out.map((p) => p.ret)).toEqual([null, null, expect.closeTo(0.21, 10), expect.closeTo(0.21, 10)]);
   });
 });

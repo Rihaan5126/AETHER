@@ -131,6 +131,7 @@ def export(out: Path, experiment_ids: list[str] | None) -> dict[str, Any]:
             ex.write(f"experiments/{eid}", detail)
             ex.write(f"experiments/{eid}/lineage", ex.get(f"/experiments/{eid}/lineage"))
             ex.write(f"experiments/{eid}/analytics", ex.get(f"/experiments/{eid}/analytics"))
+            ex.write(f"experiments/{eid}/manifest", ex.get(f"/experiments/{eid}/manifest"))
             for job in detail["jobs"]:
                 ex.write(f"jobs/{job['id']}", ex.get(f"/jobs/{job['id']}"))
             for run in detail["final_test_runs"]:
