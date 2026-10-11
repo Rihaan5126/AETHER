@@ -18,6 +18,18 @@ const KEY_GENES: Record<string, string[]> = {
   mlp: ["hidden_layers", "dropout", "learning_rate", "weight_decay", "max_epochs"],
 };
 
+/**
+ * Genes an agent ignores under its other settings (mirrors behaviour_key in
+ * trading_engine.agents.genomes): two genomes differing only here trade identically.
+ */
+export function inactiveGenes(genome: Genome | null | undefined): Set<string> {
+  if (genome?.family === "momentum") {
+    if (genome.rule === "ma_cross") return new Set(["trend_lookback"]);
+    if (genome.rule === "time_series_momentum") return new Set(["fast_window", "slow_window"]);
+  }
+  return new Set();
+}
+
 export function genomeSummary(genome: Genome): [string, string][] {
   const family = String(genome.family ?? "");
   const rows: [string, string][] = (KEY_GENES[family] ?? []).map((k) => [k, fmt(genome[k])]);

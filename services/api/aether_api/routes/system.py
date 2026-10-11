@@ -82,7 +82,12 @@ def system_status(
             "max_optuna_trials": settings.max_optuna_trials,
             "max_upload_mb": settings.max_upload_mb,
         },
-        storage={"data_dir": str(settings.data_dir), "artifact_dir": str(settings.artifact_dir)},
+        # This endpoint is public: never reveal filesystem layout outside development.
+        storage=(
+            {"data_dir": str(settings.data_dir), "artifact_dir": str(settings.artifact_dir)}
+            if settings.environment != "production"
+            else {"data_dir": "configured", "artifact_dir": "configured"}
+        ),
         dependencies=dependency_versions(),
         code_version=code_version(),
         write_protected=bool(settings.api_key),

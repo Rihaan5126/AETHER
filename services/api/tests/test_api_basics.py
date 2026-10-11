@@ -189,3 +189,11 @@ def test_job_queue_is_bounded(client, monkeypatch):
     )
     assert r.status_code == 429, r.text
     assert r.json()["error"]["code"] == "queue_full"
+
+
+def test_system_status_hides_paths_in_production(client):
+    app.dependency_overrides[get_settings] = settings_override(
+        environment="production", api_key="k"
+    )
+    storage = client.get("/api/v1/system/status").json()["storage"]
+    assert storage == {"data_dir": "configured", "artifact_dir": "configured"}

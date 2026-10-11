@@ -14,7 +14,7 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/ui/misc";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import type { LeaderboardRow } from "@/lib/api/schemas";
 import { dateTime, int, money, num, pct, shortAgentId, signClass } from "@/lib/format";
-import { flattenGenome } from "@/lib/genome";
+import { flattenGenome, inactiveGenes } from "@/lib/genome";
 import { useAgentMetrics, useAgents, useEquityCurves, useLeaderboard, useTournaments, useTrades } from "@/lib/queries";
 
 const MAX_COMPARE = 4;
@@ -79,8 +79,12 @@ function ConfigurationCard({
     const genome = { ...(a.genome as Record<string, unknown>) };
     const features = genome.features;
     delete genome.features;
+    const flatGenes = flattenGenome(genome);
+    for (const k of inactiveGenes(a.genome as Record<string, unknown>)) {
+      if (k in flatGenes) flatGenes[k] = `${flatGenes[k]} (unused)`;
+    }
     return {
-      ...flattenGenome(genome),
+      ...flatGenes,
       ...(Array.isArray(features) ? { features: `${features.length} selected` } : {}),
       seed: String(a.seed),
       origin: a.origin,
