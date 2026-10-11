@@ -1,0 +1,52 @@
+{
+  "runs": 14,
+  "selection_score_gain": {
+    "n": 14,
+    "wins": 13,
+    "losses": 0,
+    "ties": 1,
+    "mean_diff": 0.16892388120863489,
+    "median_diff": 0.13369806720559085,
+    "p_two_sided": 0.000244140625
+  },
+  "evolved_champion_unchanged_from_gen0": 1,
+  "holdout_sharpe_evolved_minus_initial": {
+    "n": 14,
+    "wins": 7,
+    "losses": 6,
+    "ties": 1,
+    "mean_diff": 0.06133977352240464,
+    "median_diff": 0.0014435966379404697,
+    "p_two_sided": 1.0
+  },
+  "holdout_sharpe_evolved_minus_search": {
+    "n": 14,
+    "wins": 7,
+    "losses": 6,
+    "ties": 1,
+    "mean_diff": 0.11589405216423519,
+    "median_diff": 0.00032393556062476625,
+    "p_two_sided": 1.0
+  },
+  "holdout_population_mean_sharpe_last_minus_gen0": {
+    "n": 14,
+    "wins": 11,
+    "losses": 3,
+    "ties": 0,
+    "mean_diff": 0.13402983910510083,
+    "median_diff": 0.13934004554981766,
+    "p_two_sided": 0.057373046875
+  },
+  "holdout_sharpe_evolved_minus_buy_and_hold": {
+    "n": 14,
+    "wins": 3,
+    "losses": 11,
+    "ties": 0,
+    "mean_diff": -0.149877164095423,
+    "median_diff": -0.19527672531019996,
+    "p_two_sided": 0.057373046875
+  },
+  "evolved_excess_ci_lower_bound_above_zero": 0,
+  "evolved_null_percentile_median": 0.575,
+  "evolved_null_percentile_at_least_95": 1
+}
