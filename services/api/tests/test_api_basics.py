@@ -170,3 +170,22 @@ def test_interrupted_jobs_are_marked_failed(client):
     assert recover_interrupted_jobs() >= 1
     job = client.get("/api/v1/jobs/job_orphan").json()
     assert job["status"] == "failed" and "interrupted" in job["error_message"]
+
+
+def test_job_queue_is_bounded(client, monkeypatch):
+    """Rate limits cap requests per minute; this caps total queued CPU work."""
+    from aether_api.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "max_pending_jobs", 0)
+    r = client.post(
+        "/api/v1/datasets/import",
+        json={
+            "name": "over the limit",
+            "source": "synthetic",
+            "symbols": ["SYN"],
+            "start_date": "2015-01-01",
+            "end_date": "2017-12-31",
+        },
+    )
+    assert r.status_code == 429, r.text
+    assert r.json()["error"]["code"] == "queue_full"

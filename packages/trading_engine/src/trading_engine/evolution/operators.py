@@ -24,6 +24,7 @@ from trading_engine.agents.genomes import (
     MomentumGenome,
     PositionPolicy,
     _LearnedGenome,
+    behaviour_key,
     parse_genome,
 )
 from trading_engine.features import feature_names
@@ -153,7 +154,9 @@ def mutate(
             child = parse_genome(data)
         except ValidationError:
             continue
-        if child != genome:
+        # A change to a gene the agent ignores (e.g. trend_lookback under the
+        # ma_cross rule) would produce a behavioural clone of the parent.
+        if behaviour_key(child) != behaviour_key(genome):
             return child, notes
     return genome, ["no valid mutation found; genome unchanged"]
 

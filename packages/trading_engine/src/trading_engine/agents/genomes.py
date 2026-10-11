@@ -10,6 +10,7 @@ mutate them generically *within* bounds without an untyped parameter bag.
 
 from __future__ import annotations
 
+import json
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator, model_validator
@@ -180,3 +181,29 @@ def default_genome(family: str) -> Genome:
 
 def genome_to_dict(genome: BaseModel) -> dict[str, Any]:
     return genome.model_dump(mode="json")
+
+
+# Genes a family's agent ignores under a given setting. Two genomes that differ only
+# in these behave identically, so evolution must not treat them as different agents.
+def _inactive_genes(data: dict[str, Any]) -> tuple[str, ...]:
+    if data.get("family") == "momentum":
+        if data["rule"] == "ma_cross":
+            return ("trend_lookback",)
+        if data["rule"] == "time_series_momentum":
+            return ("fast_window", "slow_window")
+    return ()
+
+
+def behaviour_key(genome: BaseModel, seed: int | None = None) -> str:
+    """Canonical identity of what an agent *does*.
+
+    Inactive genes are dropped. The training seed is included only for learned
+    families, where it changes the fitted model; rule-based agents are
+    deterministic, so their seed is irrelevant.
+    """
+    data = genome_to_dict(genome)
+    for name in _inactive_genes(data):
+        data.pop(name, None)
+    if seed is not None and data["family"] in LEARNED_FAMILIES:
+        data["__seed__"] = int(seed)
+    return json.dumps(data, sort_keys=True)

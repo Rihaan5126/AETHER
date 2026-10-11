@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import trading_engine.tournaments.engine as engine_mod
 from trading_engine.agents import create_agent, default_genome, parse_genome
-from trading_engine.agents.genomes import GENOME_TYPES
+from trading_engine.agents.genomes import GENOME_TYPES, MomentumGenome, behaviour_key
 from trading_engine.evolution import (
     EvolutionConfig,
     crossover,
@@ -40,6 +40,35 @@ def test_mutation_respects_bounds(family):
             if is_int:
                 assert isinstance(data[name], int)
         assert parse_genome(genome.model_dump(mode="json")) == genome
+
+
+def test_behaviour_key_ignores_unused_genes():
+    # ma_cross never reads trend_lookback, so these two agents trade identically.
+    a = MomentumGenome(rule="ma_cross", trend_lookback=60)
+    b = MomentumGenome(rule="ma_cross", trend_lookback=37)
+    assert a != b
+    assert behaviour_key(a) == behaviour_key(b)
+    c = MomentumGenome(rule="time_series_momentum", fast_window=10, slow_window=50)
+    d = MomentumGenome(rule="time_series_momentum", fast_window=20, slow_window=100)
+    assert behaviour_key(c) == behaviour_key(d)
+    assert behaviour_key(MomentumGenome(rule="both", trend_lookback=37)) != behaviour_key(
+        MomentumGenome(rule="both", trend_lookback=60)
+    )
+    # The seed matters only where it changes the fitted model.
+    assert behaviour_key(a, 1) == behaviour_key(a, 2)
+    xgb = default_genome("xgboost")
+    assert behaviour_key(xgb, 1) != behaviour_key(xgb, 2)
+
+
+@pytest.mark.parametrize("family", ["momentum", "random_forest", "xgboost", "mlp"])
+def test_mutation_always_changes_behaviour(family):
+    """Regression: a mutation of an inactive gene used to create a parent clone."""
+    rng = np.random.default_rng(3)
+    genome = default_genome(family)
+    for _ in range(300):
+        child, _ = mutate(genome, rng, strength=0.3)
+        assert behaviour_key(child) != behaviour_key(genome)
+        genome = child
 
 
 def test_random_genomes_are_valid():
@@ -86,6 +115,18 @@ def test_elite_is_preserved_with_identical_score(evolution):
     assert elites[0].parent_ids == [best0.agent_id]
     assert elites[0].genome_after == best0.genome
     assert gen1[elites[0].child_id].score == pytest.approx(gen0[best0.agent_id].score)
+
+
+def test_generations_have_no_behavioural_duplicates(dev_test):
+    dev, _ = dev_test
+    cfg = EvolutionConfig(
+        population_size=6, generations=3, elite_count=2, immigrant_count=1, families=("momentum",)
+    )
+    result = run_evolution(dev, cfg, FAST_EVAL, seed=11)
+    for gen in result.generations:
+        keys = [behaviour_key(s.genome, s.seed) for s in gen.specs if s.family == "momentum"]
+        assert len(keys) == cfg.population_size
+        assert len(set(keys)) == len(keys), f"duplicate agents in generation {gen.generation}"
 
 
 def test_benchmarks_never_reproduce(evolution):

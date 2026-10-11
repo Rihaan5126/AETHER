@@ -22,6 +22,12 @@ class WarningThresholds(BaseModel):
     excessive_turnover: float = Field(25.0, gt=0)
     unstable_fold_sharpe_std: float = Field(1.0, gt=0)
     single_period_share: float = Field(0.8, gt=0, le=1)
+    # Daily-bar strategies with a validation Sharpe this high are rare; on thin
+    # evidence it far more often signals luck, leakage or a bug than a real edge.
+    suspicious_sharpe: float = Field(2.0, gt=0)
+    suspicious_max_round_trips: int = Field(30, ge=1)
+    suspicious_max_years: float = Field(2.0, gt=0)
+    overfit_sharpe_gap: float = Field(1.0, gt=0)
 
 
 def _w(code: str, severity: str, message: str) -> dict[str, str]:
@@ -34,6 +40,7 @@ def statistical_warnings(
     *,
     is_active: bool,
     thresholds: WarningThresholds | None = None,
+    train_sharpe: float | None = None,
 ) -> list[dict[str, str]]:
     t = thresholds or WarningThresholds()
     out: list[dict[str, str]] = []
@@ -44,6 +51,36 @@ def statistical_warnings(
                 "high",
                 f"only {overall.n_round_trips} completed round trips; results are "
                 "statistically weak",
+            )
+        )
+    years = overall.sessions / 252
+    if (
+        is_active
+        and overall.sharpe_ratio is not None
+        and overall.sharpe_ratio >= t.suspicious_sharpe
+        and (overall.n_round_trips < t.suspicious_max_round_trips or years < t.suspicious_max_years)
+    ):
+        out.append(
+            _w(
+                "suspiciously_strong",
+                "high",
+                f"validation Sharpe {overall.sharpe_ratio:.2f} from {overall.n_round_trips} round "
+                f"trips over {years:.1f} years; results this strong on little evidence are "
+                "usually luck or an error",
+            )
+        )
+    if (
+        is_active
+        and train_sharpe is not None
+        and overall.sharpe_ratio is not None
+        and train_sharpe - overall.sharpe_ratio > t.overfit_sharpe_gap
+    ):
+        out.append(
+            _w(
+                "overfit_gap",
+                "medium",
+                f"in-sample Sharpe {train_sharpe:.2f} vs validation {overall.sharpe_ratio:.2f}; "
+                "the model fits its training data far better than unseen data",
             )
         )
     if overall.max_drawdown >= t.high_drawdown:

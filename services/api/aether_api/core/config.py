@@ -29,6 +29,7 @@ class Settings(BaseSettings):
 
     # Resource limits (conservative laptop defaults).
     max_concurrent_jobs: int = Field(1, ge=1, le=8)
+    max_pending_jobs: int = Field(5, ge=1, le=100)  # queued + running, across all clients
     max_workers_per_job: int = Field(1, ge=1, le=8)
     max_job_seconds: int = Field(3 * 3600, ge=60)
     max_population: int = Field(24, ge=2, le=64)

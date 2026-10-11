@@ -142,6 +142,26 @@ def _simulate_fold(
     )
 
 
+def _simulate_training_window(
+    agent: BaseTradingAgent, dev: DevelopmentData, fold: Fold, cfg: EvaluationConfig
+) -> SimulationResult:
+    """In-sample backtest on the rows the agent was fitted on (training performance).
+
+    Only used to report the train -> validation generalisation gap; it never feeds
+    ranking or selection.
+    """
+    lo, hi = int(fold.train_positions[0]), int(fold.train_positions[-1]) + 1
+    window = dev.slice_positions(lo, hi)
+    obs = Observations(dev.symbol, window.features, dev.bars.iloc[:hi])
+    return simulate(
+        window.bars,
+        agent.predict(obs),
+        execution=cfg.execution,
+        risk=cfg.risk,
+        realised_vol=window.features["vol_20"],
+    )
+
+
 def benchmark_folds(
     dev: DevelopmentData, folds: Sequence[Fold], cfg: EvaluationConfig
 ) -> list[SimulationResult]:
@@ -211,7 +231,17 @@ def evaluate_agent(
             training = _fit_for_fold(agent, dev, fold, cfg)
             res = _simulate_fold(agent, dev, fold, cfg)
             m = compute_metrics(res, bench_res.equity["equity"])
-            ev.fold_metrics.append({"fold": fold.number, **fold.to_dict(), **m.to_dict()})
+            train_m = compute_metrics(_simulate_training_window(agent, dev, fold, cfg))
+            ev.fold_metrics.append(
+                {
+                    "fold": fold.number,
+                    **fold.to_dict(),
+                    **m.to_dict(),
+                    "train_sharpe_ratio": train_m.sharpe_ratio,
+                    "train_total_return": train_m.total_return,
+                    "train_annualized_return": train_m.annualized_return,
+                }
+            )
             ev.fold_training.append({"fold": fold.number, **_jsonable(training)})
             results.append(res)
             if on_fold:
@@ -221,6 +251,10 @@ def evaluate_agent(
         trips = [t for r in results for t in round_trips(r)]
         overall = compute_metrics(stitched, bench_stitched.equity["equity"], trips=trips)
         ev.metrics = overall.to_dict()
+        train_sharpes = [
+            f["train_sharpe_ratio"] for f in ev.fold_metrics if f["train_sharpe_ratio"] is not None
+        ]
+        ev.metrics["train_sharpe_mean"] = float(np.mean(train_sharpes)) if train_sharpes else None
         from trading_engine.evaluation.metrics import PerformanceMetrics  # noqa: PLC0415
 
         fold_objs = [
@@ -228,7 +262,11 @@ def evaluate_agent(
             for m in ev.fold_metrics
         ]
         ev.warnings = statistical_warnings(
-            overall, fold_objs, is_active=spec.family != "buy_and_hold", thresholds=cfg.warnings
+            overall,
+            fold_objs,
+            is_active=spec.family != "buy_and_hold",
+            thresholds=cfg.warnings,
+            train_sharpe=ev.metrics["train_sharpe_mean"],
         )
         ev.equity = stitched.equity
         ev.trades = stitched.trades_frame()

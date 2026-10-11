@@ -29,6 +29,7 @@ from trading_engine.agents.genomes import (
     BuyAndHoldGenome,
     Genome,
     RandomGenome,
+    behaviour_key,
     default_genome,
     genome_to_dict,
 )
@@ -239,6 +240,9 @@ def _next_population(
     if not candidates:
         candidates = [e for e in ranked if not e.is_benchmark]
     out: list[tuple[BaseModel, int, LineageRecord]] = []
+    # Behaviourally identical agents waste population slots and fake diversity
+    # (e.g. two momentum genomes differing only in an unused gene).
+    seen: set[str] = set()
 
     def add(
         genome: BaseModel,
@@ -247,7 +251,11 @@ def _next_population(
         parents: list[str],
         notes: list[str],
         before: BaseModel | None,
-    ) -> None:
+    ) -> bool:
+        key = behaviour_key(genome, s)
+        if key in seen:
+            return False
+        seen.add(key)
         cid = make_id(gen, len(out), genome.family)  # type: ignore[attr-defined]
         out.append(
             (
@@ -265,13 +273,21 @@ def _next_population(
                 ),
             )
         )
+        return True
 
-    for elite in candidates[: config.elite_count]:
+    elites = 0
+    for elite in candidates:
+        if elites == config.elite_count:
+            break
         sp = spec_by_id[elite.agent_id]
-        add(sp.genome, sp.seed, "elite", [elite.agent_id], ["carried over unchanged"], sp.genome)
+        notes = ["carried over unchanged"]
+        elites += add(sp.genome, sp.seed, "elite", [elite.agent_id], notes, sp.genome)
 
     n_immigrants = min(config.immigrant_count, config.population_size - len(out))
-    while len(out) < config.population_size - n_immigrants:
+    # Bounded retries: a tiny search space could otherwise loop forever.
+    attempts, max_attempts = 0, 50 * config.population_size
+    while len(out) < config.population_size - n_immigrants and attempts < max_attempts:
+        attempts += 1
         parent = tournament_select(candidates, config.tournament_size, rng)
         pspec = spec_by_id[parent.agent_id]
         same_family = [
@@ -296,7 +312,9 @@ def _next_population(
                 pspec.genome, rng, strength=config.mutation_strength, n_changes=n_changes
             )
             add(child, new_seed(), "mutation", [parent.agent_id], notes, pspec.genome)
-    for _ in range(n_immigrants):
+    # Immigrants also fill any slots left if mutation kept producing duplicates.
+    while len(out) < config.population_size and attempts < 2 * max_attempts:
+        attempts += 1
         family = config.families[int(rng.integers(len(config.families)))]
         add(random_genome(family, rng), new_seed(), "immigrant", [], ["random immigrant"], None)
     return out

@@ -25,16 +25,18 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from aether_api.core.config import get_settings
+from aether_api.core.errors import APIError
 from aether_api.core.logging import get_logger
 from aether_api.database.models import Job, new_id, utcnow
 from aether_api.database.session import session_scope
 
 log = get_logger(__name__)
 TERMINAL = {"completed", "failed", "cancelled"}
+ACTIVE = ("queued", "running")
 HEARTBEAT_STALE = timedelta(minutes=10)
 
 
@@ -108,6 +110,17 @@ def create_job(
 ) -> Job:
     if job_type not in _HANDLERS:
         raise ValueError(f"unknown job type {job_type}")
+    # Rate limiting bounds requests per minute, not total work: without this cap a
+    # client could still queue thousands of CPU-heavy jobs over a day.
+    limit = get_settings().max_pending_jobs
+    pending = db.scalar(select(func.count()).select_from(Job).where(Job.status.in_(ACTIVE)))
+    if (pending or 0) >= limit:
+        raise APIError(
+            429,
+            "queue_full",
+            f"{pending} jobs are already queued or running (limit {limit}); "
+            "wait for them to finish or cancel one",
+        )
     job = Job(
         id=new_id("job"),
         job_type=job_type,

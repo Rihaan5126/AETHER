@@ -74,6 +74,7 @@ def system_status(
         resources=resources,
         limits={
             "max_concurrent_jobs": settings.max_concurrent_jobs,
+            "max_pending_jobs": settings.max_pending_jobs,
             "max_workers_per_job": settings.max_workers_per_job,
             "max_job_seconds": settings.max_job_seconds,
             "max_population": settings.max_population,
