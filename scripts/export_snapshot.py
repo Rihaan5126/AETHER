@@ -65,7 +65,7 @@ class Exporter:
     def write(self, rel: str, data: Any) -> None:
         path = self.out / f"{rel}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        text = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+        text = scrub_local_paths(json.dumps(data, separators=(",", ":"), ensure_ascii=False))
         path.write_text(text, encoding="utf-8")
         self.files += 1
         self.bytes += len(text.encode())
@@ -88,6 +88,24 @@ def snapshot_status(live: dict[str, Any], generated_at: str, experiments: int) -
         "write_protected": True,
         "disclaimer": live["disclaimer"],
     }
+
+
+def _path_forms(path: Path) -> list[str]:
+    """A path as it can appear in JSON: raw, JSON-escaped, and with forward slashes."""
+    raw = str(path)
+    return [raw.replace("\\", "\\\\"), raw, raw.replace("\\", "/")]
+
+
+def scrub_local_paths(text: str) -> str:
+    """Replace the repository and home directories (any spelling) with placeholders.
+
+    Stored error tracebacks and similar fields can contain absolute paths of the
+    exporting machine; they must never be published.
+    """
+    for path, placeholder in ((REPO_ROOT, "<repo>"), (Path.home(), "<home>")):
+        for form in _path_forms(path):
+            text = re.sub(re.escape(form), placeholder, text, flags=re.IGNORECASE)
+    return text
 
 
 def check_no_local_paths(out: Path) -> None:

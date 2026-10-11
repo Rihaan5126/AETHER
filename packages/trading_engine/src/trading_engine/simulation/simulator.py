@@ -186,6 +186,7 @@ def simulate(
                 else:
                     side, dq, fill, fee = trade
                     notional = abs(dq) * fill
+                    cash_before = cash
                     if side == "buy":
                         cash -= notional + fee
                         qty += dq
@@ -194,7 +195,10 @@ def simulate(
                         qty -= dq
                     if qty < 1e-12:
                         qty = 0.0
-                    if cash < 0 and cash > -1e-9:
+                    # Going all-in spends cash to ~0 and leaves float residue that scales
+                    # with the amount (~1e-16 x cash). The tolerance must be relative:
+                    # a fixed 1e-9 failed correct trades once equity grew past ~1e7.
+                    if cash < 0 and cash > -1e-9 * max(1.0, cash_before):
                         cash = 0.0
                     if cash < 0:
                         raise AssertionError("simulator produced negative cash")

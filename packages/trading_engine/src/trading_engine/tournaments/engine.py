@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import multiprocessing as mp
+import re
 import time
 import traceback
 from collections.abc import Callable, Sequence
@@ -278,9 +279,23 @@ def evaluate_agent(
     except Exception as exc:  # recorded, never swallowed: shows up as an excluded agent
         ev.error = f"{type(exc).__name__}: {exc}"
         ev.status = "failed"
-        ev.fold_training.append({"traceback": traceback.format_exc(limit=5)})
+        ev.fold_training.append({"traceback": _portable_traceback(traceback.format_exc(limit=5))})
     ev.wall_seconds = round(time.perf_counter() - started, 3)
     return ev
+
+
+_FILE_PATH = re.compile(
+    r'File "(?:[^"]*[\\/])?(site-packages|trading_engine|aether_api)([\\/][^"]*)"'
+)
+
+
+def _portable_traceback(text: str) -> str:
+    """Strip machine-specific directories from a stored traceback.
+
+    Tracebacks are persisted with results and can be served by the API, so they
+    must not reveal the host's filesystem layout (user names, install paths).
+    """
+    return _FILE_PATH.sub(lambda m: f'File "{m.group(1)}{m.group(2)}"'.replace("\\", "/"), text)
 
 
 def _jsonable(d: dict[str, Any]) -> dict[str, Any]:

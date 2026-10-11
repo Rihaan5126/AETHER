@@ -234,3 +234,21 @@ def test_parallel_tournament_matches_serial(dev_test):
     a = {e.agent_id: (e.score, e.metrics, e.fold_metrics) for e in serial.evaluations}
     b = {e.agent_id: (e.score, e.metrics, e.fold_metrics) for e in parallel.evaluations}
     assert a == b
+
+
+def test_stored_tracebacks_do_not_reveal_host_paths():
+    from trading_engine.tournaments.engine import _portable_traceback
+
+    text = (
+        "Traceback (most recent call last):\n"
+        r'  File "C:\Users\someone\proj\packages\trading_engine\src\trading_engine'
+        r'\simulation\simulator.py", line 200, in simulate'
+        "\n"
+        '  File "/home/someone/.venv/lib/python3.13/site-packages/pandas/core/frame.py", line 1\n'
+        '  File "<string>", line 3\n'
+    )
+    out = _portable_traceback(text)
+    assert "someone" not in out
+    assert 'File "trading_engine/simulation/simulator.py", line 200' in out
+    assert 'File "site-packages/pandas/core/frame.py"' in out
+    assert 'File "<string>"' in out

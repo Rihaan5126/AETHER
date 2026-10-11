@@ -159,3 +159,23 @@ def test_metrics_undefined_cases_and_known_values():
     assert (
         m.n_trades == 1 and m.n_round_trips == 0 and math.isclose(m.exposure, 29 / 30, rel_tol=1e-9)
     )
+
+
+def test_full_allocation_at_large_equity_never_trips_cash_check():
+    """Regression: the negative-cash guard used an absolute 1e-9 tolerance.
+
+    Going all-in spends cash down to ~0, so float rounding leaves a residue on the
+    order of 1e-16 * equity. Once compounding pushed equity past ~1e7 (seen on
+    long in-sample windows), that residue exceeded 1e-9 and the simulator raised
+    "negative cash" on a correct trade, so the agent was marked failed.
+    """
+    rng = np.random.default_rng(0)
+    opens = 10 * np.cumprod(1 + rng.uniform(0.02, 0.09, 400))  # equity compounds to >1e10
+    bars = make_bars(opens)
+    weights = np.where(np.arange(400) % 2 == 0, 1.0, 0.0)  # all-in / all-out every day
+    res = simulate(
+        bars, weights, execution=ExecutionConfig(fee_bps=3, slippage_bps=7, min_rebalance_weight=0)
+    )
+    assert res.final_equity > 1e7
+    assert (res.equity["cash"] >= 0).all()
+    assert len(res.trades) > 300
