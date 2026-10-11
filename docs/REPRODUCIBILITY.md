@@ -49,15 +49,15 @@ offers it as **Download JSON** on every experiment page (live site included).
 | `test_selection_is_reproducible` | Lineage (ids, operations, parents, genomes) of two evolution runs | Exact match |
 | `test_training_is_deterministic` (per learned family) | Predictions of two fits | Exact match |
 | `test_simulation_is_deterministic`, `test_features_are_deterministic`, `test_synthetic_is_deterministic_and_seed_sensitive`, `test_optuna_study_is_bounded_and_reproducible`, `test_random_null_is_deterministic_and_percentile_monotone` | Simulator, features, data, Optuna, null | Exact match |
-| **Real-data rerun** (`scripts/research/rerun_check.py "SPY|8x3|seed1"`) | A complete research run on real SPY data (evolution with 4 worker processes, random search, holdout fits of every agent, bootstrap CIs, 300-strategy null, cost sensitivity), re-run from scratch: **797 values** | **796 bit-identical; 1 differed by 2.1e-16 relative (1 ulp)**, root-caused below |
+| **Real-data rerun** (`scripts/research/rerun_check.py "SPY|8x3|seed1"`) | A complete research run on real SPY data (stored run with 6 worker processes, rerun with 4; random search, holdout fits of every agent, bootstrap CIs, 300-strategy null, cost sensitivity), re-run from scratch: **797 values** | **797 / 797 bit-identical** (final code). An earlier attempt had 796 / 797; the 1-ulp difference is root-caused below and fixed |
 
-The real-data rerun also crossed a code change. The stored run used the
-original simulator; the rerun used the Phase 2 optimised simulator. Every
-Sharpe, return, interval bound, null percentile and cost row matched exactly,
-which independently confirms that the optimisation is output-identical
-(`docs/research/rerun_SPY_8x3_seed1.json`).
+The rerun record is `docs/research/rerun_SPY_8x3_seed1.json`. An earlier rerun (in
+`docs/research/archive/attempt1_negative_cash_bug/`) also crossed a code change: the stored run
+used the original simulator and the rerun used the optimised one. Every Sharpe, return, interval
+bound, null percentile and cost row still matched exactly, which independently confirms the
+simulator optimisation is output-identical.
 
-### The one difference, and the fix
+### The 1-ulp difference in the earlier attempt, and the fix
 
 `holdout_population.last_generation.mean_sharpe` was averaged over a Python
 `set` of agent ids. Set iteration order depends on per-process string-hash

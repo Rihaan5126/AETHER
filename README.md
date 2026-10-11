@@ -172,16 +172,32 @@ container runs Alembic migrations on start; training runs in the separate
 
 ## Test status
 
-Measured on this branch (Linux, Python 3.13, Node 22):
+Measured on this branch (Windows 11, Python 3.13, Node 24; CI on Linux):
 
 | Suite | Result |
 | --- | --- |
-| `pytest` (engine + API, incl. full lifecycle, final-test lock, Optuna, cancellation, leakage tests) | 93 passed |
+| `pytest` (engine + API: accounting, look-ahead with corrupted futures for all 6 families, purging, final-test lock, evolution, bootstrap validation, reproducibility, security) | 128 passed |
 | `ruff check`, `ruff format --check`, `mypy` | clean |
-| Vitest (formatting, series maths, genome diff, builder validation, API client, components) | 24 passed |
+| Vitest (formatting, series maths, genome diff and inactive genes, builder validation, API client, snapshot resolver, components) | 33 passed |
 | ESLint, `tsc --noEmit`, `next build` | clean |
-| Playwright smoke (all pages, leaderboard to agent detail, builder validation, create and run an experiment) | 14 passed |
-| Postgres + Redis + Celery worker path | demo experiment, final test and Optuna study completed |
+| Playwright smoke (CI, Linux) | passing |
+| Production-mode API checks (`scripts/verify_deployment.py`) | 9 / 9 |
+
+## Phase 2: research findings and engineering evidence
+
+* **Does evolution generalise?** No. In a pre-registered study (5 symbols ×
+  3 seeds, Yahoo daily data 2005-2026, with an inner holdout and an
+  equal-budget random-search control), evolution raised its selection score
+  in 13 of 15 runs. Its champion was no better than the generation-0
+  champion on unseen data (6 wins / 7 losses) and lost to random search
+  (4 / 9). On the locked 2022-2026 final test, **0 of 15** evolved champions
+  beat buy-and-hold. See [EVOLUTION_RESEARCH](docs/EVOLUTION_RESEARCH.md).
+* [Phase 2 audit](docs/PHASE2_AUDIT.md) · [Reproducibility](docs/REPRODUCIBILITY.md)
+  (797 / 797 values bit-identical on a full real-data rerun) ·
+  [Performance benchmarks](docs/PERFORMANCE_BENCHMARKS.md) ·
+  [Deployment verification](docs/DEPLOYMENT_VERIFICATION.md) ·
+  [Engineering case study](docs/ENGINEERING_CASE_STUDY.md) ·
+  [Generated research tables](docs/research/PHASE2_TABLES.md)
 
 ## Repository layout
 

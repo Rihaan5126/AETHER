@@ -93,10 +93,14 @@ def bootstrap_performance(
     mean_block: float = 20.0,
     level: float = 0.95,
     seed: int = 0,
+    indices: np.ndarray | None = None,
 ) -> dict[str, Any]:
     """Bootstrap intervals for Sharpe, annual return and (optionally) excess return.
 
     ``returns`` are daily simple returns after costs; ``benchmark`` must be aligned.
+    ``indices`` (from :func:`stationary_bootstrap_indices`) lets callers evaluating
+    many strategies on one timeline reuse a single resampling, which is both cheaper
+    and gives common random numbers across strategies.
     """
     r = np.asarray(returns, dtype="float64")
     b = None if benchmark is None else np.asarray(benchmark, dtype="float64")
@@ -105,7 +109,13 @@ def bootstrap_performance(
     keep = np.isfinite(r) if b is None else np.isfinite(r) & np.isfinite(b)
     r = r[keep]
     b = None if b is None else b[keep]
-    idx = stationary_bootstrap_indices(len(r), n_boot, mean_block, np.random.default_rng(seed))
+    if indices is not None and indices.shape[1] != len(r):
+        raise ValueError("indices do not match the number of finite observations")
+    idx = (
+        indices
+        if indices is not None
+        else stationary_bootstrap_indices(len(r), n_boot, mean_block, np.random.default_rng(seed))
+    )
     rb = r[idx]
     out: dict[str, Any] = {
         "sharpe": _interval(float(_sharpe(r)), _sharpe(rb), level).to_dict(),
@@ -119,7 +129,7 @@ def bootstrap_performance(
         out["sharpe_difference"] = _interval(
             float(_sharpe(r) - _sharpe(b)), _sharpe(rb) - _sharpe(b[idx]), level
         ).to_dict()
-    out["_meta"] = {"n": len(r), "n_boot": n_boot, "mean_block": mean_block, "level": level}
+    out["_meta"] = {"n": len(r), "n_boot": len(idx), "mean_block": mean_block, "level": level}
     return out
 
 

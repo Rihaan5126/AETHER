@@ -16,8 +16,8 @@ statistics. **Low**: a correctness nuance, inefficiency or documentation gap.
 | Severity | Found | Fixed | Documented / open |
 | --- | --- | --- | --- |
 | Critical | 0 | 0 | 0 |
-| High | 2 | 1 | 1 (mitigated by the inner-holdout study) |
-| Medium | 10 | 8 | 2 |
+| High | 3 | 2 | 1 (mitigated by the inner-holdout study) |
+| Medium | 11 | 9 | 2 |
 | Low | 8 | 4 | 4 |
 
 No critical issue was found. In particular, no look-ahead or leakage was
@@ -57,6 +57,19 @@ API's experiment flow does not yet hold out a selection-free window
 automatically. That is the main recommended product change (see
 "Recommended next steps").
 
+**H3. Simulator raised "negative cash" on correct trades at large equity. Fixed.**
+After an all-in buy, float residue is about 1e-16 x cash, but the guard used a
+fixed tolerance of 1e-9. Once an overfit model's in-sample equity compounded
+past ~1e7, correct trades raised errors and the agent was marked failed and
+excluded (6 of 150 results in the first showcase experiments, and an unknown
+number in the first study attempt). It was found because the new
+training-window backtest exercised long compounding windows.
+*Fix:* tolerance relative to the pre-trade cash; regression test
+`test_full_allocation_at_large_equity_never_trips_cash_check` (fails on the
+old code). The affected study attempt was archived
+(`docs/research/archive/attempt1_negative_cash_bug/`) and re-run from scratch;
+the affected showcase experiments are kept, labelled superseded, and replaced.
+
 ### Medium
 
 | ID | Finding | Evidence | Resolution |
@@ -70,6 +83,7 @@ automatically. That is the main recommended product change (see
 | M7 | No train -> validation gap | Training metrics were classification-only | **Fixed**: per-fold in-sample backtest (`train_sharpe_ratio`, `train_sharpe_mean`), shown next to validation and test |
 | M8 | Missing warnings for implausible results | No flag for a high Sharpe on thin evidence or for overfitting | **Fixed**: `suspiciously_strong`, `overfit_gap`; unit tests |
 | M9 | Rate limiter keys on `request.client.host` | Behind a proxy every client shares one address | **Open** (documented): run uvicorn with `--proxy-headers` or limit at the gateway |
+| M11 | Host paths in stored tracebacks reached the public snapshot (commit 7b9e93e; OS user name only) | Exporter safety check | **Fixed**: paths stripped at the source (`_portable_traceback`) and scrubbed by the exporter; tested |
 | M10 | Job timeout is cooperative | `max_job_seconds` is checked between units of work; one long fit cannot be interrupted | **Open** (documented): Celery `time_limit` on the worker; MLP epochs are already bounded by `max_fit_seconds` |
 
 ### Low
@@ -95,6 +109,7 @@ automatically. That is the main recommended product change (see
 | Backtesting accuracy | Sound | Analytic tests (fees, slippage, cash conservation, integer sizing, circuit breaker) + new portfolio look-ahead test |
 | Data leakage | None found | Feature and agent poisoned-future tests for all 6 families; final test locked by type (`DevelopmentData`) |
 | Evolutionary selection | **H1 fixed, H2 mitigated** | See above |
+| Simulator numerics | **H3 fixed** | Relative cash tolerance; large-equity regression test |
 | Tournament evaluation | Sound + improved | Same folds, costs, risk; score components exposed; new warnings |
 | Database and migrations | Sound | Normalised schema, FKs, indexes; CI runs `alembic check` |
 | API behaviour | Sound + M2/M4 fixed | Typed schemas, structured errors, 202 + job ids, idempotent creation |
@@ -103,7 +118,7 @@ automatically. That is the main recommended product change (see
 | Error handling | Improved (M5, L7) | Error boundary, explicit error states |
 | Logging | Adequate | structlog, JSON in Compose; no aggregation configured |
 | Security | M2-M4 fixed, M9 open | Every job-creating route requires `X-API-Key`; production refuses to start without it; constant-time key check; only a constant `SELECT 1` raw SQL; uploads size-capped before parsing; pickle loaded only after SHA-256 verification; no secrets in git (pattern scan) |
-| Test coverage | Extended | Python 93 -> 130 tests and Vitest 24 -> 33 during Phase 2 (counts in `docs/ENGINEERING_CASE_STUDY.md`) |
+| Test coverage | Extended | pytest 93 -> 128 and Vitest 24 -> 33 during Phase 2 |
 | Dependency compatibility | Fixed (M1) | Windows (this machine) and Linux (CI) both green |
 
 ## Things that were checked and are correct

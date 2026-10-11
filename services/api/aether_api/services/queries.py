@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from trading_engine.agents.genomes import GENOME_TYPES
 from trading_engine.evolution import numeric_genes
-from trading_engine.research import bootstrap_performance
+from trading_engine.research import bootstrap_performance, stationary_bootstrap_indices
 
 from aether_api.core.errors import not_found
 from aether_api.database.models import (
@@ -352,13 +352,21 @@ def _uncertainty(
         return []
     rets = wide.pct_change().iloc[1:]
     bench = rets[BENCHMARK_CURVE_ID]
+    # Every agent shares this timeline: resample once and reuse (same intervals as
+    # resampling per agent with the same seed, without regenerating ~1e6 indices each).
+    shared: dict[int, np.ndarray] = {}
     out = []
     for row in rows:
         aid = row["agent_id"]
         if aid not in rets or (row["is_benchmark"] and row["algorithm"] != "buy_and_hold"):
             continue
         r = rets[aid]
-        boot = bootstrap_performance(r, bench, n_boot=1000, mean_block=20, seed=0)
+        n_ok = int((r.notna() & bench.notna()).sum())
+        if n_ok < 2:
+            continue
+        if n_ok not in shared:
+            shared[n_ok] = stationary_bootstrap_indices(n_ok, 1000, 20, np.random.default_rng(0))
+        boot = bootstrap_performance(r, bench, mean_block=20, indices=shared[n_ok])
         metrics = (results[aid].metrics_json or {}) if aid in results else {}
         out.append(
             {

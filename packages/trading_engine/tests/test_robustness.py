@@ -96,3 +96,16 @@ def test_cost_sensitivity_is_exact_and_monotone():
     assert rows[0]["cost_drag"] == 0.0
     returns = [r["total_return"] for r in rows]
     assert returns == sorted(returns, reverse=True) and returns[0] > returns[-1]
+
+
+def test_shared_indices_match_per_call_resampling():
+    """The analytics endpoint reuses one resampling across agents; results must not change."""
+    rng = np.random.default_rng(9)
+    b = rng.normal(0.0004, 0.01, 700)
+    a = b + rng.normal(0.0001, 0.004, 700)
+    idx = stationary_bootstrap_indices(700, 300, 20, np.random.default_rng(0))
+    shared = bootstrap_performance(a, b, mean_block=20, indices=idx)
+    fresh = bootstrap_performance(a, b, n_boot=300, mean_block=20, seed=0)
+    assert shared == fresh
+    with pytest.raises(ValueError):
+        bootstrap_performance(a[:-1], b[:-1], indices=idx)
