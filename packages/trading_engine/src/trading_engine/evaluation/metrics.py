@@ -78,7 +78,21 @@ def drawdown_series(equity: pd.Series) -> pd.Series:
 
 def round_trips(result: SimulationResult) -> list[RoundTrip]:
     """Completed flat -> long -> flat episodes with net P&L after costs."""
-    index = {ts.normalize(): i for i, ts in enumerate(result.equity.index)}
+    eq_index = pd.DatetimeIndex(result.equity.index)
+    if eq_index.tz is None:
+        # Trade times are ISO strings that start with the session date; one
+        # vectorised format beats boxing every equity timestamp.
+        days = np.datetime_as_string(eq_index.normalize().to_numpy(), unit="D")
+        by_day = {d: i for i, d in enumerate(days.tolist())}
+
+        def position(stamp: str, default: int) -> int:
+            return by_day.get(stamp[:10], default)
+    else:
+        by_ts = {ts.normalize(): i for i, ts in enumerate(eq_index)}
+
+        def position(stamp: str, default: int) -> int:
+            return by_ts.get(pd.Timestamp(stamp).normalize(), default)
+
     trips: list[RoundTrip] = []
     flow = 0.0
     invested = 0.0
@@ -92,8 +106,8 @@ def round_trips(result: SimulationResult) -> list[RoundTrip]:
         else:
             flow += t.notional - t.fee
         if entry is not None and t.position_after == 0.0:
-            start = index.get(pd.Timestamp(entry).normalize(), 0)
-            stop = index.get(pd.Timestamp(t.executed_time).normalize(), start)
+            start = position(entry, 0)
+            stop = position(t.executed_time, start)
             trips.append(
                 RoundTrip(
                     entry,

@@ -89,6 +89,39 @@ def _fmt(ts: pd.Timestamp, offset: pd.Timedelta) -> str:
     return (ts.normalize() + offset).isoformat()
 
 
+# "THH:MM:SS" suffixes of the nominal event times, exactly as isoformat() renders them.
+_SIGNAL_SUFFIX = (pd.Timestamp(0) + SIGNAL_TIME).isoformat()[10:]
+_EXECUTION_SUFFIX = (pd.Timestamp(0) + EXECUTION_TIME).isoformat()[10:]
+
+
+class _Stamps:
+    """ISO timestamps for signal/execution events, formatted once per bar.
+
+    Formatting each trade's timestamps through pandas boxing dominated the
+    loop for trade-heavy agents. For tz-naive indexes (all AETHER datasets) the
+    session dates are formatted in one vectorised call; the strings are
+    identical to ``_fmt``. Tz-aware indexes fall back to ``_fmt``.
+    """
+
+    def __init__(self, dates: pd.DatetimeIndex) -> None:
+        self.dates = dates
+        self.days = (
+            np.datetime_as_string(dates.normalize().to_numpy(), unit="D")
+            if dates.tz is None
+            else None
+        )
+
+    def signal(self, i: int) -> str:
+        if self.days is None:
+            return _fmt(self.dates[i], SIGNAL_TIME)
+        return f"{self.days[i]}{_SIGNAL_SUFFIX}"
+
+    def execution(self, i: int) -> str:
+        if self.days is None:
+            return _fmt(self.dates[i], EXECUTION_TIME)
+        return f"{self.days[i]}{_EXECUTION_SUFFIX}"
+
+
 def simulate(
     bars: pd.DataFrame,
     target_weights: np.ndarray | pd.Series,
@@ -110,13 +143,15 @@ def simulate(
     if not bars.index.is_monotonic_increasing:
         raise ValueError("bars must be sorted")
     manager = RiskManager(risk_cfg)
+    n = len(bars)
     opens = bars["open"].to_numpy(dtype="float64")
     closes = bars["close"].to_numpy(dtype="float64")
     dates = pd.DatetimeIndex(bars.index)
+    stamps = _Stamps(dates)
     vols = (
         realised_vol.reindex(bars.index).to_numpy(dtype="float64")
         if realised_vol is not None
-        else np.full(len(bars), np.nan)
+        else np.full(n, np.nan)
     )
     fee_rate = cfg.fee_bps / 1e4
     slip = cfg.slippage_bps / 1e4
@@ -132,23 +167,21 @@ def simulate(
     rows: list[tuple[float, ...]] = []
     stale_days = 0
 
-    for i in range(len(bars)):
+    for i in range(n):
         # ---- EXECUTION at open(i) -------------------------------------------------
         if pending is not None:
             target, decided_at = pending
             pending = None
             ref = opens[i]
             if not math.isfinite(ref) or ref <= 0:
-                rejected.append(
-                    RejectedOrder(_fmt(dates[i], EXECUTION_TIME), target, "missing_market_data")
-                )
+                rejected.append(RejectedOrder(stamps.execution(i), target, "missing_market_data"))
             else:
                 trade, reason = _execute(
                     cash, qty, target, ref, fee_rate, cfg.fee_fixed, slip, cfg.fractional_shares
                 )
                 if trade is None:
                     rejected.append(
-                        RejectedOrder(_fmt(dates[i], EXECUTION_TIME), target, reason or "rejected")
+                        RejectedOrder(stamps.execution(i), target, reason or "rejected")
                     )
                 else:
                     side, dq, fill, fee = trade
@@ -165,11 +198,12 @@ def simulate(
                         cash = 0.0
                     if cash < 0:
                         raise AssertionError("simulator produced negative cash")
+                    signal_time = stamps.signal(decided_at)
                     trades.append(
                         Trade(
-                            signal_time=_fmt(dates[decided_at], SIGNAL_TIME),
-                            submitted_time=_fmt(dates[decided_at], SIGNAL_TIME),
-                            executed_time=_fmt(dates[i], EXECUTION_TIME),
+                            signal_time=signal_time,
+                            submitted_time=signal_time,
+                            executed_time=stamps.execution(i),
                             side=side,
                             quantity=dq,
                             reference_price=ref,
@@ -201,7 +235,7 @@ def simulate(
         rows.append((cash, qty, mark, position_value, equity, weight, equity / peak - 1))
 
         # ---- DECISION after close(i) ---------------------------------------------
-        if i == len(bars) - 1:
+        if i == n - 1:
             break  # no next session to execute in
         snapshot = PortfolioSnapshot(
             equity=equity,
@@ -213,7 +247,7 @@ def simulate(
         for ev in decision.events:
             risk_events.append(
                 {
-                    "time": _fmt(dates[i], SIGNAL_TIME),
+                    "time": stamps.signal(i),
                     "code": ev.code,
                     "message": ev.message,
                     "proposed_weight": ev.proposed_weight,
